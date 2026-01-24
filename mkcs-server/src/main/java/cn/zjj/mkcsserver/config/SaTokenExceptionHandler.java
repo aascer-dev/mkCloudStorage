@@ -1,0 +1,82 @@
+package cn.zjj.mkcsserver.config;
+
+import cn.dev33.satoken.context.SaHolder;
+import cn.dev33.satoken.exception.BackResultException;
+import cn.dev33.satoken.exception.StopMatchException;
+import cn.dev33.satoken.filter.SaServletFilter;
+import cn.dev33.satoken.router.SaHttpMethod;
+import cn.dev33.satoken.router.SaRouter;
+import cn.dev33.satoken.stp.StpUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zjj.mkcscommon.Result;
+import com.zjj.mkcscommon.ResultCode;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+/**
+ * Sa-Token过滤器配置，用于统一异常处理
+ */
+@Configuration
+public class SaTokenExceptionHandler {
+    
+    /**
+     * 注册Sa-Token全局过滤器
+     */
+    @Bean
+    public SaServletFilter getSaServletFilter() {
+        return new SaServletFilter()
+            // 指定[拦截路由]与[放行路由]
+            .addInclude("/**")
+            .addExclude("/favicon.ico")
+            
+            // 认证函数: 每次请求执行
+            .setAuth(obj -> {
+                SaRouter.match("/**")
+                    .notMatch("/api/auth/**")    // 排除认证相关接口
+                    .notMatch("/api/example/**") // 排除示例接口
+                    .notMatch("/error")          // 排除错误页面
+                    .check(r -> StpUtil.checkLogin());
+            })
+            
+            // 异常处理函数：每次[认证函数]发生异常时执行此函数
+            .setError(e -> {
+                // 设置响应头
+                SaHolder.getResponse().setHeader("Content-Type", "application/json;charset=UTF-8");
+                
+                // 创建统一的错误响应
+                Result<Void> result;
+                if (e instanceof BackResultException) {
+                    // 这种异常不需要处理，直接返回
+                    return e.getMessage();
+                } else if (e instanceof StopMatchException) {
+                    // 停止匹配异常，返回未授权
+                    result = Result.error(ResultCode.UNAUTHORIZED);
+                } else {
+                    // 其他异常统一返回未授权
+                    result = Result.error(ResultCode.UNAUTHORIZED.getCode(), "认证失败: " + e.getMessage());
+                }
+                
+                try {
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    return objectMapper.writeValueAsString(result);
+                } catch (Exception ex) {
+                    return "{\"code\":401,\"message\":\"认证失败\",\"data\":null,\"timestamp\":" + System.currentTimeMillis() + "}";
+                }
+            })
+            
+            // 前置函数：在每次[认证函数]之前执行
+            .setBeforeAuth(obj -> {
+                // 设置跨域响应头
+                SaHolder.getResponse()
+                    .setHeader("Access-Control-Allow-Origin", "*")
+                    .setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+                    .setHeader("Access-Control-Allow-Headers", "*")
+                    .setHeader("Access-Control-Max-Age", "3600");
+                
+                // 如果是预检请求，则立即返回成功
+                SaRouter.match(SaHttpMethod.OPTIONS)
+                    .free(r -> System.out.println("--------OPTIONS预检请求，不做处理"))
+                    .back();
+            });
+    }
+}

@@ -1,0 +1,16 @@
+package cn.zjj.mkcsserver.service;
+
+import cn.zjj.mkcsmodel.entity.FileFavorites;
+import com.baomidou.mybatisplus.extension.service.IService;
+
+/**
+ * <p>
+ * 文件/文件夹收藏表 - 用户星标/收藏功能 服务类
+ * </p>
+ *
+ * @author zjj
+ * @since 2026-01-22
+ */
+public interface FileFavoritesService extends IService<FileFavorites> {
+
+}
