@@ -1,4 +1,4 @@
-package com.zjj.mkcscommon;
+package com.zjj.mkcscommon.enumeration;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

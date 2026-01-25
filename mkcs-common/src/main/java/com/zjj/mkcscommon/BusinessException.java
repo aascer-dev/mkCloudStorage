@@ -1,5 +1,6 @@
 package com.zjj.mkcscommon;
 
+import com.zjj.mkcscommon.enumeration.ResultCode;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 

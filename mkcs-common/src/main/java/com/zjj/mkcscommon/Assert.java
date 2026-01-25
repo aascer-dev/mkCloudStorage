@@ -1,5 +1,7 @@
 package com.zjj.mkcscommon;
 
+import com.zjj.mkcscommon.enumeration.ResultCode;
+
 import java.util.Collection;
 import java.util.Objects;
 

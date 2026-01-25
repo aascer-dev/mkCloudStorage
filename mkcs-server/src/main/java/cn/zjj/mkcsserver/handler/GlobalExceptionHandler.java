@@ -1,8 +1,8 @@
 package cn.zjj.mkcsserver.handler;
 
 import com.zjj.mkcscommon.BusinessException;
-import com.zjj.mkcscommon.Result;
-import com.zjj.mkcscommon.ResultCode;
+import com.zjj.mkcscommon.result.Result;
+import com.zjj.mkcscommon.enumeration.ResultCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.BindException;

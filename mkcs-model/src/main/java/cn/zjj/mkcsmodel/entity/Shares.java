@@ -8,7 +8,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
@@ -23,7 +22,7 @@ import java.time.LocalDateTime;
 @Setter
 @ToString
 @TableName("shares")
-public class Shares implements Serializable {
+public class Shares extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -86,16 +85,4 @@ public class Shares implements Serializable {
      */
     @TableField("status")
     private Byte status;
-
-    /**
-     * 分享时间
-     */
-    @TableField("created_time")
-    private LocalDateTime createdTime;
-
-    /**
-     * 更新时间
-     */
-    @TableField("update_time")
-    private LocalDateTime updateTime;
 }

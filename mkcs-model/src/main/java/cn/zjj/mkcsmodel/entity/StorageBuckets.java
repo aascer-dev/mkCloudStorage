@@ -8,9 +8,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.io.Serializable;
-import java.time.LocalDateTime;
-
 /**
  * <p>
  * 存储桶 - 容量与归属的核心表
@@ -23,7 +20,7 @@ import java.time.LocalDateTime;
 @Setter
 @ToString
 @TableName("storage_buckets")
-public class StorageBuckets implements Serializable {
+public class StorageBuckets extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -74,16 +71,4 @@ public class StorageBuckets implements Serializable {
      */
     @TableField("status")
     private Byte status;
-
-    /**
-     * 创建时间
-     */
-    @TableField("created_time")
-    private LocalDateTime createdTime;
-
-    /**
-     * 更新时间
-     */
-    @TableField("update_time")
-    private LocalDateTime updateTime;
 }

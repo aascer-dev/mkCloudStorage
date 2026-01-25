@@ -8,8 +8,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.io.Serializable;
-import java.time.LocalDateTime;
 
 /**
  * <p>
@@ -23,7 +21,7 @@ import java.time.LocalDateTime;
 @Setter
 @ToString
 @TableName("file_contents")
-public class FileContents implements Serializable {
+public class FileContents extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -69,15 +67,4 @@ public class FileContents implements Serializable {
     @TableField("reference_count")
     private Integer referenceCount;
 
-    /**
-     * 创建时间
-     */
-    @TableField("created_time")
-    private LocalDateTime createdTime;
-
-    /**
-     * 更新时间
-     */
-    @TableField("update_time")
-    private LocalDateTime updateTime;
 }

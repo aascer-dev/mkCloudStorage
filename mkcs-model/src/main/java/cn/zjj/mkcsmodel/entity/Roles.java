@@ -8,9 +8,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.io.Serializable;
-import java.time.LocalDateTime;
-
 /**
  * <p>
  * 角色定义表
@@ -23,7 +20,7 @@ import java.time.LocalDateTime;
 @Setter
 @ToString
 @TableName("roles")
-public class Roles implements Serializable {
+public class Roles extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -44,16 +41,4 @@ public class Roles implements Serializable {
      */
     @TableField("description")
     private String description;
-
-    /**
-     * 创建时间
-     */
-    @TableField("created_time")
-    private LocalDateTime createdTime;
-
-    /**
-     * 更新时间
-     */
-    @TableField("update_time")
-    private LocalDateTime updateTime;
 }

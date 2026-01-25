@@ -1,5 +1,7 @@
-package com.zjj.mkcscommon;
+package com.zjj.mkcscommon.result;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.zjj.mkcscommon.enumeration.ResultCode;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -97,6 +99,7 @@ public class Result<T> {
      * 判断是否成功
      * @return boolean
      */
+    @JsonIgnore
     public boolean isSuccess() {
         return ResultCode.SUCCESS.getCode().equals(this.code);
     }

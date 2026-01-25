@@ -1,6 +1,8 @@
-package cn.zjj.mkcsmodel.dto;
+package cn.zjj.mkcsserver.converter;
 
 import cn.zjj.mkcsmodel.entity.Users;
+import cn.zjj.mkcsmodel.vo.LoginResponse;
+import cn.zjj.mkcsmodel.vo.UserInfoResponse;
 
 import java.util.List;
 

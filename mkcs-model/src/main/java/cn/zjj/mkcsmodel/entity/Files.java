@@ -8,7 +8,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
@@ -23,7 +22,7 @@ import java.time.LocalDateTime;
 @Setter
 @ToString
 @TableName("files")
-public class Files implements Serializable {
+public class Files extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -88,19 +87,7 @@ public class Files implements Serializable {
     private Byte status;
 
     /**
-     * 创建时间
-     */
-    @TableField("created_time")
-    private LocalDateTime createdTime;
-
-    /**
-     * 更新时间
-     */
-    @TableField("update_time")
-    private LocalDateTime updateTime;
-
-    /**
-     * 最后一次访问/打开/预览/下载的时间，用于“最近使用”排序
+     * 最后一次访问/打开/预览/下载的时间，用于"最近使用"排序
      */
     @TableField("last_accessed_time")
     private LocalDateTime lastAccessedTime;

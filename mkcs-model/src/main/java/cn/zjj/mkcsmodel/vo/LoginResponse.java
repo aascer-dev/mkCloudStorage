@@ -1,4 +1,4 @@
-package cn.zjj.mkcsmodel.dto;
+package cn.zjj.mkcsmodel.vo;
 
 import lombok.Data;
 import lombok.Builder;

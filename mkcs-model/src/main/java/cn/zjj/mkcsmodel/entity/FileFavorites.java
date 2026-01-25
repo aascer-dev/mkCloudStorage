@@ -8,9 +8,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.io.Serializable;
-import java.time.LocalDateTime;
-
 /**
  * <p>
  * 文件/文件夹收藏表 - 用户星标/收藏功能
@@ -23,7 +20,7 @@ import java.time.LocalDateTime;
 @Setter
 @ToString
 @TableName("file_favorites")
-public class FileFavorites implements Serializable {
+public class FileFavorites extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -56,16 +53,4 @@ public class FileFavorites implements Serializable {
      */
     @TableField("status")
     private Byte status;
-
-    /**
-     * 收藏时间
-     */
-    @TableField("created_time")
-    private LocalDateTime createdTime;
-
-    /**
-     * 更新时间
-     */
-    @TableField("update_time")
-    private LocalDateTime updateTime;
 }

@@ -8,7 +8,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
@@ -23,7 +22,7 @@ import java.time.LocalDateTime;
 @Setter
 @ToString
 @TableName("upload_tasks")
-public class UploadTasks implements Serializable {
+public class UploadTasks extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -122,18 +121,6 @@ public class UploadTasks implements Serializable {
      */
     @TableField("final_file_id")
     private Long finalFileId;
-
-    /**
-     * 任务创建时间
-     */
-    @TableField("created_time")
-    private LocalDateTime createdTime;
-
-    /**
-     * 最后更新时间
-     */
-    @TableField("update_time")
-    private LocalDateTime updateTime;
 
     /**
      * 任务过期时间（未完成可自动清理）

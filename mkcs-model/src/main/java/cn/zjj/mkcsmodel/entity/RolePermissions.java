@@ -8,9 +8,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.io.Serializable;
-import java.time.LocalDateTime;
-
 /**
  * <p>
  * 角色-权限关联表
@@ -23,7 +20,7 @@ import java.time.LocalDateTime;
 @Setter
 @ToString
 @TableName("role_permissions")
-public class RolePermissions implements Serializable {
+public class RolePermissions extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -44,16 +41,4 @@ public class RolePermissions implements Serializable {
      */
     @TableField("permission_id")
     private Long permissionId;
-
-    /**
-     * 创建时间
-     */
-    @TableField("created_time")
-    private LocalDateTime createdTime;
-
-    /**
-     * 更新时间
-     */
-    @TableField("update_time")
-    private LocalDateTime updateTime;
 }

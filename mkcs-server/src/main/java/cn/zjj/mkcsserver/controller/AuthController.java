@@ -1,11 +1,15 @@
 package cn.zjj.mkcsserver.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
-import com.zjj.mkcscommon.Result;
-import com.zjj.mkcscommon.ResultCode;
+import com.zjj.mkcscommon.result.Result;
+import com.zjj.mkcscommon.enumeration.ResultCode;
 import cn.zjj.mkcsmodel.dto.LoginRequest;
-import cn.zjj.mkcsmodel.dto.LoginResponse;
-import cn.zjj.mkcsmodel.dto.UserInfoResponse;
+import cn.zjj.mkcsmodel.vo.LoginResponse;
+import cn.zjj.mkcsmodel.vo.UserInfoResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,20 +20,27 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 认证控制器
+ * Authentication Controller
  */
 @Slf4j
 @RestController
 @RequestMapping("/api/auth")
+@Tag(name = "Authentication", description = "User authentication related APIs")
 public class AuthController {
     
     /**
-     * 登录接口
+     * User login
      */
     @PostMapping("/login")
+    @Operation(summary = "User Login", description = "User login API with remember me functionality")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Login successful"),
+        @ApiResponse(responseCode = "400", description = "Invalid parameters"),
+        @ApiResponse(responseCode = "401", description = "Invalid username or password")
+    })
     public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         // 参数校验已通过@Valid注解完成
-        
+        log.info("用户登录: username={}, rememberMe={}", request.getUsername(), request.getRememberMe());
         // 这里应该是真实的用户验证逻辑
         // 为了演示，我们简单验证用户名密码
         if (!"admin".equals(request.getUsername()) || !"123456".equals(request.getPassword())) {
@@ -46,7 +57,7 @@ public class AuthController {
             // 普通登录：2小时有效期
             StpUtil.login(userId, 2 * 60 * 60);
         }
-        
+
         // 构建登录响应
         LoginResponse loginResponse = LoginResponse.builder()
                 .token(StpUtil.getTokenValue())
@@ -64,22 +75,31 @@ public class AuthController {
                 .rememberMe(request.getRememberMe())
                 .build();
         
-        return Result.success("登录成功", loginResponse);
+        return Result.success("Login successful", loginResponse);
     }
     
     /**
-     * 登出接口
+     * User logout
      */
     @PostMapping("/logout")
+    @Operation(summary = "User Logout", description = "User logout API, clear login status")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Logout successful")
+    })
     public Result<String> logout() {
         StpUtil.logout();
-        return Result.success("登出成功");
+        return Result.success("Logout successful");
     }
     
     /**
-     * 获取当前用户信息
+     * Get current user information
      */
     @GetMapping("/userinfo")
+    @Operation(summary = "Get User Info", description = "获取当前登录用户信息，Get current logged-in user detailed information")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Get successful"),
+        @ApiResponse(responseCode = "401", description = "Not logged in")
+    })
     public Result<UserInfoResponse> getUserInfo() {
         // 检查登录状态
         StpUtil.checkLogin();
@@ -99,13 +119,17 @@ public class AuthController {
                 .updateTime(LocalDateTime.now())
                 .build();
         
-        return Result.success("获取用户信息成功", userInfo);
+        return Result.success("Get user info successful", userInfo);
     }
     
     /**
-     * 检查登录状态
+     * Check login status
      */
     @GetMapping("/check")
+    @Operation(summary = "检查登录状态", description = "Check current user login status and token information")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Check successful")
+    })
     public Result<Map<String, Object>> checkLogin() {
         Map<String, Object> data = new HashMap<>();
         data.put("isLogin", StpUtil.isLogin());
@@ -122,13 +146,18 @@ public class AuthController {
             data.put("sessionTimeout", -1);
         }
         
-        return Result.success("检查登录状态成功", data);
+        return Result.success("Check login status successful", data);
     }
     
     /**
-     * 刷新Token
+     * Refresh token
      */
     @PostMapping("/refresh")
+    @Operation(summary = "Refresh Token", description = "Refresh current user token, extend validity period")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Refresh successful"),
+        @ApiResponse(responseCode = "401", description = "Not logged in")
+    })
     public Result<Map<String, Object>> refreshToken() {
         // 检查登录状态
         StpUtil.checkLogin();
@@ -140,7 +169,7 @@ public class AuthController {
         data.put("token", StpUtil.getTokenValue());
         data.put("expiresIn", StpUtil.getTokenTimeout());
         
-        return Result.success("Token刷新成功", data);
+        return Result.success("Token refresh successful", data);
     }
 
 }

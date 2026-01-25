@@ -8,8 +8,8 @@ import cn.dev33.satoken.router.SaHttpMethod;
 import cn.dev33.satoken.router.SaRouter;
 import cn.dev33.satoken.stp.StpUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.zjj.mkcscommon.Result;
-import com.zjj.mkcscommon.ResultCode;
+import com.zjj.mkcscommon.result.Result;
+import com.zjj.mkcscommon.enumeration.ResultCode;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -28,13 +28,28 @@ public class SaTokenExceptionHandler {
             // 指定[拦截路由]与[放行路由]
             .addInclude("/**")
             .addExclude("/favicon.ico")
+            .addExclude("/swagger-ui/**")    // 排除 Swagger UI
+            .addExclude("/swagger-ui.html")  // 排除 Swagger UI 页面
+            .addExclude("/v3/api-docs/**")   // 排除 OpenAPI 文档
+            .addExclude("/v3/api-docs")      // 排除 OpenAPI 文档根路径
+            .addExclude("/swagger-resources/**") // 排除 Swagger 资源
+            .addExclude("/webjars/**")       // 排除静态资源
             
             // 认证函数: 每次请求执行
             .setAuth(obj -> {
+                // 暂时禁用所有认证，用于测试 SpringDoc OpenAPI
                 SaRouter.match("/**")
                     .notMatch("/api/auth/**")    // 排除认证相关接口
                     .notMatch("/api/example/**") // 排除示例接口
                     .notMatch("/error")          // 排除错误页面
+                    .notMatch("/favicon.ico")    // 排除网站图标
+                    // SpringDoc OpenAPI 相关路径排除
+                    .notMatch("/swagger-ui/**")  // 排除 Swagger UI
+                    .notMatch("/swagger-ui.html") // 排除 Swagger UI 页面
+                    .notMatch("/v3/api-docs/**") // 排除 OpenAPI 文档
+                    .notMatch("/v3/api-docs")    // 排除 OpenAPI 文档根路径
+                    .notMatch("/swagger-resources/**") // 排除 Swagger 资源
+                    .notMatch("/webjars/**")     // 排除静态资源
                     .check(r -> StpUtil.checkLogin());
             })
             

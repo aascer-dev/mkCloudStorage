@@ -8,9 +8,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.io.Serializable;
-import java.time.LocalDateTime;
-
 /**
  * <p>
  * 上传任务分片明细表（断点续传核心）
@@ -23,7 +20,7 @@ import java.time.LocalDateTime;
 @Setter
 @ToString
 @TableName("upload_task_chunks")
-public class UploadTaskChunks implements Serializable {
+public class UploadTaskChunks extends BaseEntity {
 
     private static final long serialVersionUID = 1L;
 
@@ -68,7 +65,4 @@ public class UploadTaskChunks implements Serializable {
      */
     @TableField("etag")
     private String etag;
-
-    @TableField("updated_time")
-    private LocalDateTime updatedTime;
 }
