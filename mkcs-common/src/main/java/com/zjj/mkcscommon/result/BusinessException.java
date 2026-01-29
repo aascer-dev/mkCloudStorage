@@ -1,4 +1,4 @@
-package com.zjj.mkcscommon;
+package com.zjj.mkcscommon.result;
 
 import com.zjj.mkcscommon.enumeration.ResultCode;
 import lombok.Data;

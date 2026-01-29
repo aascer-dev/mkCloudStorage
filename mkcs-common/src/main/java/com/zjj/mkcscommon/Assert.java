@@ -1,6 +1,7 @@
 package com.zjj.mkcscommon;
 
 import com.zjj.mkcscommon.enumeration.ResultCode;
+import com.zjj.mkcscommon.result.BusinessException;
 
 import java.util.Collection;
 import java.util.Objects;
@@ -49,6 +50,28 @@ public class Assert {
      * @param resultCode 结果码
      */
     public static void notEmpty(String str, ResultCode resultCode) {
+        if (str == null || str.trim().isEmpty()) {
+            throw new BusinessException(resultCode);
+        }
+    }
+    
+    /**
+     * 断言字符串有文本内容，为空则抛出异常
+     * @param str 字符串
+     * @param message 异常消息
+     */
+    public static void hasText(String str, String message) {
+        if (str == null || str.trim().isEmpty()) {
+            throw new BusinessException(message);
+        }
+    }
+    
+    /**
+     * 断言字符串有文本内容，为空则抛出异常
+     * @param str 字符串
+     * @param resultCode 结果码
+     */
+    public static void hasText(String str, ResultCode resultCode) {
         if (str == null || str.trim().isEmpty()) {
             throw new BusinessException(resultCode);
         }

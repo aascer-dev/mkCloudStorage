@@ -15,7 +15,7 @@ public class Generator {
     
     public static void main(String[] args) {
         // 数据库连接配置
-        String url = "jdbc:mysql://localhost:3306/mkcs?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8";
+        String url = "jdbc:mysql://localhost:3306/mkCloudStorage?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8";
         String username = "root";
         String password = "123456";
         
@@ -54,10 +54,8 @@ public class Generator {
                 })
                 // 策略配置
                 .strategyConfig(builder -> {
-                    builder.addInclude("users", "roles", "permissions", "user_roles", "role_permissions", 
-                                     "oauth_identities", "storage_buckets", "files", "file_contents", 
-                                     "file_favorites", "shares", "upload_tasks", "upload_task_chunks") // 设置需要生成的表名
-                            .addTablePrefix("t_", "c_") // 设置过滤表前缀
+                    builder.addInclude() // 设置需要生成的表名
+                            //.addTablePrefix("t_", "c_") // 设置过滤表前缀
                             // 实体类策略配置
                             .entityBuilder()
                             .enableLombok() // 开启 lombok 模式
@@ -66,7 +64,6 @@ public class Generator {
                             // Controller策略配置
                             .controllerBuilder()
                             .enableRestStyle() // 开启生成@RestController 控制器
-                            .enableFileOverride() // 覆盖已生成文件
                             // Service策略配置
                             .serviceBuilder()
                             .formatServiceFileName("%sService") // 格式化 service 接口文件名称

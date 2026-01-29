@@ -9,7 +9,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
  * </p>
  *
  * @author zjj
- * @since 2026-01-22
+ * @since 2026-01-27
  */
 public interface UploadTaskChunksService extends IService<UploadTaskChunks> {
 

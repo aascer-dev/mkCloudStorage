@@ -8,23 +8,23 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * OpenAPI Configuration
+ * OpenAPI 配置类
  */
 @Configuration
 public class OpenApiConfig {
 
     /**
-     * Configure OpenAPI basic information
+     * 配置基本信息
      */
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("MKCS Cloud Storage System API")
+                        .title("MKCS 云存储系统 API")
                         .version("1.0.0")
-                        .description("MKCS Cloud Storage System API Documentation")
+                        .description("MKCS 云存储系统接口文档")
                         .contact(new Contact()
-                                .name("Development Team")
+                                .name("开发团队")
                                 .email("dev@mkcs.com")
                                 .url("https://mkcs.com"))
                         .license(new License()

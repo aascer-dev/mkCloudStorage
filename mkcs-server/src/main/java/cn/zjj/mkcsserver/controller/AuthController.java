@@ -1,175 +1,171 @@
 package cn.zjj.mkcsserver.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
-import com.zjj.mkcscommon.result.Result;
-import com.zjj.mkcscommon.enumeration.ResultCode;
+import cn.zjj.mkcsmodel.entity.Users;
+import cn.zjj.mkcsserver.converter.UserConverter;
+import cn.zjj.mkcsserver.service.UsersService;
 import cn.zjj.mkcsmodel.dto.LoginRequest;
+import cn.zjj.mkcsmodel.dto.RegisterRequest;
 import cn.zjj.mkcsmodel.vo.LoginResponse;
 import cn.zjj.mkcsmodel.vo.UserInfoResponse;
+import com.zjj.mkcscommon.Assert;
+import com.zjj.mkcscommon.enumeration.ResultCode;
+import com.zjj.mkcscommon.result.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.User;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Authentication Controller
+ * 认证控制器
  */
 @Slf4j
 @RestController
 @RequestMapping("/api/auth")
-@Tag(name = "Authentication", description = "User authentication related APIs")
+@Tag(name = "认证管理", description = "用户认证相关接口")
+@RequiredArgsConstructor
 public class AuthController {
-    
+
+    private final UsersService usersService;
+
     /**
-     * User login
+     * 用户注册
+     */
+    @PostMapping("/register")
+    @Operation(summary = "用户注册", description = "创建新用户并自动登录")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "注册成功"),
+            @ApiResponse(responseCode = "400", description = "参数错误"),
+            @ApiResponse(responseCode = "409", description = "用户名或邮箱已存在")
+    })
+    public Result<LoginResponse> register(@Valid @RequestBody RegisterRequest registerRequest) {
+        return usersService.register(registerRequest);
+    }
+
+    /**
+     * 用户登录
      */
     @PostMapping("/login")
-    @Operation(summary = "User Login", description = "User login API with remember me functionality")
+    @Operation(summary = "用户登录", description = "用户登录接口，支持记住我功能")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Login successful"),
-        @ApiResponse(responseCode = "400", description = "Invalid parameters"),
-        @ApiResponse(responseCode = "401", description = "Invalid username or password")
+            @ApiResponse(responseCode = "200", description = "登录成功"),
+            @ApiResponse(responseCode = "400", description = "参数错误"),
+            @ApiResponse(responseCode = "401", description = "用户名或密码错误")
     })
-    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        // 参数校验已通过@Valid注解完成
-        log.info("用户登录: username={}, rememberMe={}", request.getUsername(), request.getRememberMe());
-        // 这里应该是真实的用户验证逻辑
-        // 为了演示，我们简单验证用户名密码
-        if (!"admin".equals(request.getUsername()) || !"123456".equals(request.getPassword())) {
-            return Result.error(ResultCode.LOGIN_FAILED);
-        }
-        
-        // 根据remember me设置不同的超时时间
-        long userId = 1001L; // 假设用户ID为1001
-        
-        if (Boolean.TRUE.equals(request.getRememberMe())) {
-            // 记住我：7天有效期
-            StpUtil.login(userId, 7 * 24 * 60 * 60);
-        } else {
-            // 普通登录：2小时有效期
-            StpUtil.login(userId, 2 * 60 * 60);
-        }
-
-        // 构建登录响应
-        LoginResponse loginResponse = LoginResponse.builder()
-                .token(StpUtil.getTokenValue())
-                .tokenType("Bearer")
-                .expiresIn(StpUtil.getTokenTimeout())
-                .id(userId)
-                .currentBucketId(1L) // 示例存储桶ID
-                .username(request.getUsername())
-                .nickname("管理员")
-                .email("admin@example.com")
-                .avatarUrl("https://example.com/avatar.jpg")
-                .status((byte) 1) // 正常状态
-                .roles(Arrays.asList("ROLE_ADMIN", "ROLE_USER"))
-                .permissions(Arrays.asList("file:read", "file:write", "file:delete", "sys:user:ban"))
-                .rememberMe(request.getRememberMe())
-                .build();
-        
-        return Result.success("Login successful", loginResponse);
+    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
+        return usersService.login(loginRequest);
     }
-    
+
     /**
-     * User logout
+     * 用户登出
      */
     @PostMapping("/logout")
-    @Operation(summary = "User Logout", description = "User logout API, clear login status")
+    @Operation(summary = "用户登出", description = "用户登出接口，清除登录状态")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Logout successful")
+            @ApiResponse(responseCode = "200", description = "登出成功")
     })
-    public Result<String> logout() {
+    public com.zjj.mkcscommon.result.Result<String> logout() {
+        StpUtil.checkLogin();
         StpUtil.logout();
-        return Result.success("Logout successful");
+        return Result.success("登出成功");
     }
-    
+
     /**
-     * Get current user information
+     * 获取当前用户信息
      */
     @GetMapping("/userinfo")
-    @Operation(summary = "Get User Info", description = "获取当前登录用户信息，Get current logged-in user detailed information")
+    @Operation(summary = "获取用户信息", description = "获取当前登录用户的详细信息")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Get successful"),
-        @ApiResponse(responseCode = "401", description = "Not logged in")
+            @ApiResponse(responseCode = "200", description = "获取成功"),
+            @ApiResponse(responseCode = "401", description = "未登录")
     })
-    public Result<UserInfoResponse> getUserInfo() {
+    public Result<LoginResponse> getUserInfo() {
         // 检查登录状态
         StpUtil.checkLogin();
-        
+
         // 构建用户信息响应
-        UserInfoResponse userInfo = UserInfoResponse.builder()
-                .id(Long.valueOf(StpUtil.getLoginId().toString()))
-                .currentBucketId(1L) // 示例存储桶ID
-                .username("admin")
-                .nickname("管理员")
-                .email("admin@example.com")
-                .avatarUrl("https://example.com/avatar.jpg")
-                .status((byte) 1) // 正常状态
-                .roles(StpUtil.getRoleList())
-                .permissions(StpUtil.getPermissionList())
-                .createdTime(LocalDateTime.now().minusDays(30))
-                .updateTime(LocalDateTime.now())
-                .build();
-        
-        return Result.success("Get user info successful", userInfo);
+        Users users = usersService.getBaseMapper().selectById((String) StpUtil.getLoginId());
+        return Result.success("获取用户信息成功", UserConverter.toLoginResponse(users, false));
     }
-    
+
     /**
-     * Check login status
+     * 检查登录状态
      */
     @GetMapping("/check")
-    @Operation(summary = "检查登录状态", description = "Check current user login status and token information")
+    @Operation(summary = "检查登录状态", description = "检查当前用户的登录状态和Token信息")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Check successful")
-    })
-    public Result<Map<String, Object>> checkLogin() {
-        Map<String, Object> data = new HashMap<>();
-        data.put("isLogin", StpUtil.isLogin());
-        
-        if (StpUtil.isLogin()) {
-            data.put("loginId", StpUtil.getLoginId());
-            data.put("tokenValue", StpUtil.getTokenValue());
-            data.put("tokenTimeout", StpUtil.getTokenTimeout());
-            data.put("sessionTimeout", StpUtil.getSessionTimeout());
-        } else {
-            data.put("loginId", null);
-            data.put("tokenValue", null);
-            data.put("tokenTimeout", -1);
-            data.put("sessionTimeout", -1);
-        }
-        
-        return Result.success("Check login status successful", data);
+            @ApiResponse(responseCode = "200", description = "已登录"),
+            @ApiResponse(responseCode = "2005", description = "用户未登录")
     }
-    
+    )
+    public Result<Map<String, Object>> checkLogin() {
+
+        //判断是否登录
+        Assert.isTrue(StpUtil.isLogin(), ResultCode.NOT_LOGIN);
+
+        return Result.success("用户已登录", null);
+    }
+
     /**
-     * Refresh token
+     * 刷新Token
      */
     @PostMapping("/refresh")
-    @Operation(summary = "Refresh Token", description = "Refresh current user token, extend validity period")
+    @Operation(summary = "刷新Token", description = "刷新当前用户的Token，延长有效期")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Refresh successful"),
-        @ApiResponse(responseCode = "401", description = "Not logged in")
+            @ApiResponse(responseCode = "200", description = "刷新成功"),
+            @ApiResponse(responseCode = "401", description = "未登录")
     })
     public Result<Map<String, Object>> refreshToken() {
         // 检查登录状态
         StpUtil.checkLogin();
-        
+
         // 刷新Token（延长有效期）
-        StpUtil.renewTimeout(2 * 60 * 60); // 延长2小时
-        
+        StpUtil.renewTimeout(7 * 24 * 60 * 60); // 延长7天
+
         Map<String, Object> data = new HashMap<>();
         data.put("token", StpUtil.getTokenValue());
         data.put("expiresIn", StpUtil.getTokenTimeout());
-        
-        return Result.success("Token refresh successful", data);
+
+        return Result.success("Token刷新成功", data);
+    }
+
+    /**
+     * 检查用户名/邮箱是否已存在
+     */
+    @GetMapping("/check-availability")
+    @Operation(summary = "检查用户名或邮箱是否已存在", description = "注册前检测用户名/邮箱是否可用")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "检测成功"),
+            @ApiResponse(responseCode = "400", description = "参数错误")
+    })
+    public Result<Map<String, Object>> checkAvailability(
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String email) {
+
+        boolean hasUsername = username != null && !username.trim().isEmpty();
+        boolean hasEmail = email != null && !email.trim().isEmpty();
+        Assert.isTrue(hasUsername || hasEmail, "username 或 email 至少提供一个");
+
+        Map<String, Object> data = new HashMap<>();
+        if (hasUsername) {
+            data.put("username", username);
+            data.put("usernameAvailable", usersService.isUsernameAvailable(username, null));
+        }
+        if (hasEmail) {
+            data.put("email", email);
+            data.put("emailAvailable", usersService.isEmailAvailable(email, null));
+        }
+        return Result.success("检测成功", data);
     }
 
 }

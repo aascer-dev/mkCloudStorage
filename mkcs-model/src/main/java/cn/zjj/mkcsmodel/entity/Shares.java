@@ -1,5 +1,6 @@
 package cn.zjj.mkcsmodel.entity;
 
+import cn.zjj.mkcsmodel.entity.base.BaseEntity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -29,7 +30,7 @@ public class Shares extends BaseEntity {
     /**
      * 主键ID
      */
-    @TableId(value = "id", type = IdType.AUTO)
+    @TableId(value = "id", type = IdType.ASSIGN_ID)
     private Long id;
 
     /**

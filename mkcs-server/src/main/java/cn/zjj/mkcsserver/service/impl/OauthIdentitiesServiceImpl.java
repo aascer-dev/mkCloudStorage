@@ -1,5 +1,6 @@
 package cn.zjj.mkcsserver.service.impl;
 
+
 import cn.zjj.mkcsmodel.entity.OauthIdentities;
 import cn.zjj.mkcsserver.mapper.OauthIdentitiesMapper;
 import cn.zjj.mkcsserver.service.OauthIdentitiesService;
@@ -12,7 +13,7 @@ import org.springframework.stereotype.Service;
  * </p>
  *
  * @author zjj
- * @since 2026-01-22
+ * @since 2026-01-27
  */
 @Service
 public class OauthIdentitiesServiceImpl extends ServiceImpl<OauthIdentitiesMapper, OauthIdentities> implements OauthIdentitiesService {

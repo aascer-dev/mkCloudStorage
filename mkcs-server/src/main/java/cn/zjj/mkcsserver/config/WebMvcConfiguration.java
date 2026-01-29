@@ -50,7 +50,7 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
     public StringHttpMessageConverter stringHttpMessageConverter() {
         StringHttpMessageConverter converter = new StringHttpMessageConverter();
         converter.setDefaultCharset(StandardCharsets.UTF_8);
-        
+
         // Support multiple media types with UTF-8 encoding
         List<MediaType> supportedMediaTypes = new ArrayList<>();
         supportedMediaTypes.add(new MediaType("text", "plain", StandardCharsets.UTF_8));
@@ -58,7 +58,7 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
         supportedMediaTypes.add(new MediaType("application", "json", StandardCharsets.UTF_8));
         supportedMediaTypes.add(new MediaType("application", "*+json", StandardCharsets.UTF_8));
         converter.setSupportedMediaTypes(supportedMediaTypes);
-        
+
         return converter;
     }
 
@@ -70,14 +70,14 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
         MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter();
         converter.setObjectMapper(new JacksonObjectMapper());
         converter.setDefaultCharset(StandardCharsets.UTF_8);
-        
+
         // Support JSON media types with UTF-8 encoding
         List<MediaType> supportedMediaTypes = new ArrayList<>();
         supportedMediaTypes.add(new MediaType("application", "json", StandardCharsets.UTF_8));
         supportedMediaTypes.add(new MediaType("application", "*+json", StandardCharsets.UTF_8));
         supportedMediaTypes.add(new MediaType("text", "json", StandardCharsets.UTF_8));
         converter.setSupportedMediaTypes(supportedMediaTypes);
-        
+
         return converter;
     }
 
@@ -87,10 +87,10 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
     @Override
     public void configureMessageConverters(@NonNull List<HttpMessageConverter<?>> converters) {
         log.info("Configuring message converters with UTF-8 encoding...");
-        
+
         // Add UTF-8 string converter first
         converters.add(stringHttpMessageConverter());
-        
+
         // Add UTF-8 JSON converter
         converters.add(mappingJackson2HttpMessageConverter());
     }

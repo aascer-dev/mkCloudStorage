@@ -1,4 +1,4 @@
-package cn.zjj.mkcsserver.config;
+package cn.zjj.mkcsserver.handler;
 
 import cn.dev33.satoken.context.SaHolder;
 import cn.dev33.satoken.exception.BackResultException;
@@ -37,7 +37,6 @@ public class SaTokenExceptionHandler {
             
             // 认证函数: 每次请求执行
             .setAuth(obj -> {
-                // 暂时禁用所有认证，用于测试 SpringDoc OpenAPI
                 SaRouter.match("/**")
                     .notMatch("/api/auth/**")    // 排除认证相关接口
                     .notMatch("/api/example/**") // 排除示例接口

@@ -9,6 +9,7 @@ import com.fasterxml.jackson.datatype.jsr310.deser.LocalTimeDeserializer;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateSerializer;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalDateTimeSerializer;
 import com.fasterxml.jackson.datatype.jsr310.ser.LocalTimeSerializer;
+import lombok.RequiredArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -30,13 +31,13 @@ public class JacksonObjectMapper extends ObjectMapper {
 
     public JacksonObjectMapper() {
         super();
-        // Do not throw exception when receiving unknown properties
+        // 接收未知字段时不抛异常
         this.configure(FAIL_ON_UNKNOWN_PROPERTIES, false);
 
-        // Compatibility handling when properties do not exist during deserialization
+        // 反序列化时，字段不存在则兼容处理
         this.getDeserializationConfig().withoutFeatures(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
-        // Ensure UTF-8 encoding for JSON processing
+        // JSON 处理保持 UTF-8 编码
         this.getFactory().setCharacterEscapes(null);
 
         SimpleModule simpleModule = new SimpleModule()
@@ -47,7 +48,7 @@ public class JacksonObjectMapper extends ObjectMapper {
                 .addSerializer(LocalDate.class, new LocalDateSerializer(DateTimeFormatter.ofPattern(DEFAULT_DATE_FORMAT)))
                 .addSerializer(LocalTime.class, new LocalTimeSerializer(DateTimeFormatter.ofPattern(DEFAULT_TIME_FORMAT)));
 
-        // Register functional modules, for example, custom serializers and deserializers can be added
+        // 注册功能模块，例如可添加自定义序列化/反序列化器
         this.registerModule(simpleModule);
     }
 }

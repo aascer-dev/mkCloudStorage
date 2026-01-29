@@ -25,8 +25,8 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
         
         // 填充创建时间和更新时间
         LocalDateTime now = LocalDateTime.now();
-        this.strictInsertFill(metaObject, "createdTime", LocalDateTime.class, now);
-        this.strictInsertFill(metaObject, "updateTime", LocalDateTime.class, now);
+        this.strictInsertFill(metaObject, "createdAt", LocalDateTime.class, now);
+        this.strictInsertFill(metaObject, "updatedAt", LocalDateTime.class, now);
         
         // 填充创建人和更新人
         Long currentUserId = getCurrentUserId();
@@ -42,7 +42,7 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
         log.info("开始更新填充...");
         
         // 填充更新时间
-        this.strictUpdateFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());
+        this.strictUpdateFill(metaObject, "updatedAt", LocalDateTime.class, LocalDateTime.now());
         
         // 填充更新人
         Long currentUserId = getCurrentUserId();

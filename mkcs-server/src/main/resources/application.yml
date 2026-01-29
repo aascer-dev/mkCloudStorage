@@ -1,47 +1,49 @@
 server:
+  # 应用监听端口与 Tomcat 编码
   port: 8080
-  servlet:
-    encoding:
-      charset: UTF-8
-      enabled: true
-      force: true
-      force-request: true
-      force-response: true
   tomcat:
     uri-encoding: UTF-8
-
+# 日志配置
+logging:
+  level:
+    root: INFO
+    web: INFO
+    org.springframework: WARN
 spring:
   profiles:
+    # 当前激活的环境配置，指向 application-dev.yml
     active: dev
   main:
     allow-circular-references: true
     allow-bean-definition-overriding: true
-  http:
-    encoding:
-      charset: UTF-8
-      enabled: true
-      force: true
-      force-request: true
-      force-response: true
   datasource:
+    # 使用 Druid 数据源；具体连接信息来自 mkcs.* 外部配置
     type: com.alibaba.druid.pool.DruidDataSource
     driver-class-name: ${mkcs.datasource.driver-class-name}
     url: jdbc:mysql://${mkcs.datasource.host}:${mkcs.datasource.port}/${mkcs.datasource.database}?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
     username: ${mkcs.datasource.username}
     password: ${mkcs.datasource.password}
     druid:
+      # 连接池初始化与容量控制
       initial-size: 5
       min-idle: 5
       max-active: 20
       max-wait: 60000
+      # 空闲检测与回收
       time-between-eviction-runs-millis: 60000
       min-evictable-idle-time-millis: 300000
+      # 连接有效性校验
       validation-query: SELECT 1 FROM DUAL
       test-while-idle: true
-      test-on-borrow: false
+      test-on-borrow: true
       test-on-return: false
+      # 预编译语句池配置
       pool-prepared-statements: true
       max-pool-prepared-statement-per-connection-size: 20
+      # 快速失败：数据库不可用时启动直接中断
+      fail-fast: true
+      break-after-acquire-failure: true
+      connection-error-retry-attempts: 0
   data:
     redis:
       host: ${mkcs.redis.host}
@@ -58,58 +60,43 @@ spring:
 
 ############## Sa-Token 配置 (文档: https://sa-token.cc) ##############
 sa-token:
-    # token 名称（同时也是 cookie 名称）
-    token-name: mkcs
-    # token 有效期（单位：秒） 默认30天，-1 代表永久有效
-    timeout: 7200
-    # token 最低活跃频率（单位：秒），如果 token 超过此时间没有访问系统就会被冻结，默认-1 代表不限制，永不冻结
-    active-timeout: -1
-    # 是否允许同一账号多地同时登录 （为 true 时允许一起登录, 为 false 时新登录挤掉旧登录）
-    is-concurrent: true
-    # 在多人登录同一账号时，是否共用一个 token （为 true 时所有登录共用一个 token, 为 false 时每次登录新建一个 token）
-    is-share: false
-    # token 风格（默认可取值：uuid、simple-uuid、random-32、random-64、random-128、tik）
-    token-style: uuid
-    # 是否输出操作日志
-    is-log: true
-    # 是否尝试从cookie里读取token
-    is-read-cookie: true
-    # 是否尝试从header里读取token
-    is-read-header: true
-#    # token前缀
+    token-name: mkcs            # Token 名称/同名 Cookie
+    timeout: 7200               # Token 有效期（秒），-1 永久
+    active-timeout: -1          # 最低活跃频率（秒），-1 不冻结
+    is-concurrent: true         # 允许多地同时登录
+    is-share: false             # 多人登录同账号是否共用一个 token
+    token-style: uuid           # Token 生成策略
+    is-log: true                # 是否输出操作日志
+    is-read-cookie: true        # 是否从 Cookie 读取 token
+    is-read-header: true        # 是否从 Header 读取 token
 #    token-prefix: Bearer
 
 mybatis-plus:
-  # mapper xml 文件位置（如果使用 xml 方式写 SQL）
   mapper-locations: classpath*:/mapper/**/*.xml
-
-  # 实体扫描，多个 package 用逗号或分号分隔
   type-aliases-package: cn.zjj.mkcsmodel.entity
-
   configuration:
-    # 驼峰转下划线（默认 true，MP 推荐开启）
     map-underscore-to-camel-case: true
-    # 日志（开发环境建议开启，生产关闭）
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
-
   global-config:
     db-config:
-      # 主键类型（默认 ASSIGN_ID 雪花算法，推荐）
-      id-type: assign_id
-      # # 表名前缀（可选）
-      # table-prefix: tbl_
-      # 逻辑删除（可选）
-      logic-delete-field: deleted  # 实体类字段名
+      id-type: assign_id        # 主键生成策略，雪花算法
+      # table-prefix: tbl_      # 可选表前缀
+      logic-delete-field: deleted
       logic-delete-value: 1
       logic-not-delete-value: 0
+
 mkcs:
   minio:
     access-key: ${mkcs.minio.access-key}
     secret-key: ${mkcs.minio.secret-key}
     endpoint: ${mkcs.minio.endpoint}
     bucket-name: ${mkcs.minio.bucket-name}
+  crypto:
+    default-salt: mkcs-cloud-storage-salt           # 默认盐值
+    default-password: mkcs-default-encryption-key   # 默认对称加密密钥
+    bcrypt-strength: 12                             # BCrypt 强度 (4-31)
 
-# SpringDoc OpenAPI Configuration
+# SpringDoc OpenAPI / Swagger UI 配置
 springdoc:
   api-docs:
     path: /v3/api-docs
@@ -125,3 +112,5 @@ springdoc:
     default-model-expand-depth: 1
   show-actuator: false
   writer-with-default-pretty-printer: true
+
+

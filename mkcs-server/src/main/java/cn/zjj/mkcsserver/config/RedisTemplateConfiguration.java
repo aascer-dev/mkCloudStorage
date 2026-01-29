@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
@@ -18,6 +19,7 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @Configuration
 @EnableCaching
 @Slf4j
+@RequiredArgsConstructor
 public class RedisTemplateConfiguration {
 
     /**
@@ -69,6 +71,7 @@ public class RedisTemplateConfiguration {
         template.setHashValueSerializer(jackson2JsonRedisSerializer);
 
         template.afterPropertiesSet();
+        log.debug("Custom RedisTemplate created: {}", template);
         return template;
     }
 }

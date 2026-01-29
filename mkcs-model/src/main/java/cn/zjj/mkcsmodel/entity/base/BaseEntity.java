@@ -1,4 +1,4 @@
-package cn.zjj.mkcsmodel.entity;
+package cn.zjj.mkcsmodel.entity.base;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -20,14 +20,14 @@ public abstract class BaseEntity implements Serializable {
     /**
      * 创建时间
      */
-    @TableField(value = "created_time", fill = FieldFill.INSERT)
-    private LocalDateTime createdTime;
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
+    private LocalDateTime createdAt;
 
     /**
      * 更新时间
      */
-    @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updatedAt;
 
     /**
      * 创建人ID

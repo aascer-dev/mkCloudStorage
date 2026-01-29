@@ -1,6 +1,5 @@
 package cn.zjj.mkcsserver.service.impl;
 
-import cn.zjj.mkcsmodel.entity.FileContents;
 import cn.zjj.mkcsserver.mapper.FileContentsMapper;
 import cn.zjj.mkcsserver.service.FileContentsService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -12,9 +11,9 @@ import org.springframework.stereotype.Service;
  * </p>
  *
  * @author zjj
- * @since 2026-01-22
+ * @since 2026-01-27
  */
 @Service
-public class FileContentsServiceImpl extends ServiceImpl<FileContentsMapper, FileContents> implements FileContentsService {
+public class FileContentsServiceImpl extends ServiceImpl<FileContentsMapper, cn.zjj.mkcsmodel.entity.FileContents> implements FileContentsService {
 
 }

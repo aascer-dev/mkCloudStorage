@@ -1,7 +1,8 @@
 package cn.zjj.mkcsserver.mapper;
 
-import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import cn.zjj.mkcsmodel.entity.OauthIdentities;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
  * <p>
@@ -9,8 +10,9 @@ import cn.zjj.mkcsmodel.entity.OauthIdentities;
  * </p>
  *
  * @author zjj
- * @since 2026-01-22
+ * @since 2026-01-27
  */
+@Mapper
 public interface OauthIdentitiesMapper extends BaseMapper<OauthIdentities> {
 
 }

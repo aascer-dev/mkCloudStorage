@@ -1,30 +1,16 @@
 package cn.zjj.mkcsserver.converter;
 
+import cn.dev33.satoken.stp.StpUtil;
 import cn.zjj.mkcsmodel.entity.Users;
 import cn.zjj.mkcsmodel.vo.LoginResponse;
-import cn.zjj.mkcsmodel.vo.UserInfoResponse;
 
-import java.util.List;
-
-/**
- * 用户实体与DTO转换工具类
- */
 public class UserConverter {
-    
-    /**
-     * Users实体转LoginResponse
-     */
-    public static LoginResponse toLoginResponse(Users user, String token, Long expiresIn, 
-                                              List<String> roles, List<String> permissions, 
-                                              Boolean rememberMe) {
-        if (user == null) {
-            return null;
-        }
-        
-        return LoginResponse.builder()
-                .token(token)
+    // 将Users实体转换为LoginResponse响应对象
+    public static LoginResponse toLoginResponse(Users user, boolean rememberMe) {
+        LoginResponse loginResponse = LoginResponse.builder()
+                .token(StpUtil.getTokenValue())
                 .tokenType("Bearer")
-                .expiresIn(expiresIn)
+                .expiresIn(StpUtil.getTokenTimeout())
                 .id(user.getId())
                 .currentBucketId(user.getCurrentBucketId())
                 .username(user.getUsername())
@@ -32,32 +18,10 @@ public class UserConverter {
                 .email(user.getEmail())
                 .avatarUrl(user.getAvatarUrl())
                 .status(user.getStatus())
-                .roles(roles)
-                .permissions(permissions)
+                .roles(StpUtil.getRoleList())
+                .permissions(StpUtil.getPermissionList())
                 .rememberMe(rememberMe)
                 .build();
-    }
-    
-    /**
-     * Users实体转UserInfoResponse
-     */
-    public static UserInfoResponse toUserInfoResponse(Users user, List<String> roles, List<String> permissions) {
-        if (user == null) {
-            return null;
-        }
-        
-        return UserInfoResponse.builder()
-                .id(user.getId())
-                .currentBucketId(user.getCurrentBucketId())
-                .username(user.getUsername())
-                .nickname(user.getNickname())
-                .email(user.getEmail())
-                .avatarUrl(user.getAvatarUrl())
-                .status(user.getStatus())
-                .roles(roles)
-                .permissions(permissions)
-                .createdTime(user.getCreatedTime())
-                .updateTime(user.getUpdateTime())
-                .build();
+        return loginResponse;
     }
 }
