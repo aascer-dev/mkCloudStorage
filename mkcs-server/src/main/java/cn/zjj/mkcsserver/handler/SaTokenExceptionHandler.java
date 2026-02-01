@@ -18,7 +18,8 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 public class SaTokenExceptionHandler {
-    
+
+    //TODO详细配置satoken的认证和异常处理
     /**
      * 注册Sa-Token全局过滤器
      */
@@ -34,12 +35,12 @@ public class SaTokenExceptionHandler {
             .addExclude("/v3/api-docs")      // 排除 OpenAPI 文档根路径
             .addExclude("/swagger-resources/**") // 排除 Swagger 资源
             .addExclude("/webjars/**")       // 排除静态资源
+
             
             // 认证函数: 每次请求执行
             .setAuth(obj -> {
                 SaRouter.match("/**")
                     .notMatch("/api/auth/**")    // 排除认证相关接口
-                    .notMatch("/api/example/**") // 排除示例接口
                     .notMatch("/error")          // 排除错误页面
                     .notMatch("/favicon.ico")    // 排除网站图标
                     // SpringDoc OpenAPI 相关路径排除

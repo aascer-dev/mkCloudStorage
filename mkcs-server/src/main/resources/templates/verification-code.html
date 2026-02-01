@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>验证码</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f7fa;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .email-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: #ffffff;
+        }
+
+        .email-header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .email-header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .email-body {
+            padding: 40px 30px;
+        }
+
+        .greeting {
+            font-size: 18px;
+            color: #333333;
+            margin-bottom: 20px;
+        }
+
+        .message {
+            font-size: 15px;
+            color: #666666;
+            margin-bottom: 30px;
+            line-height: 1.8;
+        }
+
+        .code-container {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            margin: 30px 0;
+            border: 2px dashed #667eea;
+        }
+
+        .code-label {
+            font-size: 14px;
+            color: #666666;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .code {
+            font-size: 36px;
+            font-weight: 700;
+            color: #667eea;
+            letter-spacing: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .code-hint {
+            font-size: 13px;
+            color: #999999;
+            margin-top: 15px;
+        }
+
+        .warning-box {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px 20px;
+            margin: 25px 0;
+            border-radius: 4px;
+        }
+
+        .warning-box p {
+            font-size: 14px;
+            color: #856404;
+            margin: 5px 0;
+        }
+
+        .info-list {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px 25px;
+            margin: 25px 0;
+        }
+
+        .info-list li {
+            font-size: 14px;
+            color: #666666;
+            margin: 10px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .info-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .email-footer {
+            background-color: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .footer-text {
+            font-size: 13px;
+            color: #999999;
+            margin: 5px 0;
+        }
+
+        .footer-link {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .footer-link:hover {
+            text-decoration: underline;
+        }
+
+        .divider {
+            height: 1px;
+            background: linear-gradient(to right, transparent, #e9ecef, transparent);
+            margin: 30px 0;
+        }
+
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                border-radius: 0;
+            }
+
+            .email-header {
+                padding: 30px 20px;
+            }
+
+            .email-header h1 {
+                font-size: 24px;
+            }
+
+            .email-body {
+                padding: 30px 20px;
+            }
+
+            .code {
+                font-size: 28px;
+                letter-spacing: 6px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- 邮件头部 -->
+        <div class="email-header">
+            <h1>🔐 验证码</h1>
+            <p>MK Cloud Storage 云存储平台</p>
+        </div>
+
+        <!-- 邮件正文 -->
+        <div class="email-body">
+            <div class="greeting">
+                您好！
+            </div>
+
+            <div class="message">
+                您正在进行 <strong th:text="${type}">操作</strong>，请使用以下验证码完成验证：
+            </div>
+
+            <!-- 验证码区域 -->
+            <div class="code-container">
+                <div class="code-label">您的验证码</div>
+                <div class="code" th:text="${code}">123456</div>
+                <div class="code-hint">
+                    有效期 <span th:text="${validMinutes}">5</span> 分钟，请尽快使用
+                </div>
+            </div>
+
+            <!-- 安全提示 -->
+            <div class="warning-box">
+                <p><strong>⚠️ 安全提示</strong></p>
+                <p>请勿将验证码透露给他人，包括客服人员。</p>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- 温馨提示 -->
+            <div class="info-list">
+                <ul style="list-style: none;">
+                    <li>验证码 <span th:text="${validMinutes}">5</span> 分钟内有效</li>
+                    <li>如非本人操作，请忽略此邮件</li>
+                    <li>为了您的账户安全，请勿泄露验证码</li>
+                    <li>如有疑问，请联系客服支持</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 邮件底部 -->
+        <div class="email-footer">
+            <p class="footer-text">
+                此邮件由系统自动发送，请勿直接回复
+            </p>
+            <p class="footer-text">
+                © 2026 MK Cloud Storage. All rights reserved.
+            </p>
+            <p class="footer-text">
+                <a href="#" class="footer-link">访问官网</a> |
+                <a href="#" class="footer-link">帮助中心</a> |
+                <a href="#" class="footer-link">联系我们</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

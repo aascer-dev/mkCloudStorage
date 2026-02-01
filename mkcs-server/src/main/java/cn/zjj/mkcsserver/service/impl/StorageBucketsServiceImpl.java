@@ -62,6 +62,7 @@ public class StorageBucketsServiceImpl extends ServiceImpl<StorageBucketsMapper,
             bucket.setName(bucketName);
             bucket.setDescription(description);
             bucket.setStatus((byte) 1);
+            bucket.setTotalStorage(10737418240L);
             
             save(bucket);
             log.info("存储桶创建成功：用户ID={}, 存储桶名称={}", userId, bucketName);

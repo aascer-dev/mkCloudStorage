@@ -57,6 +57,37 @@ spring:
           max-wait: -1ms
           max-idle: 8
           min-idle: 0
+  rabbitmq:
+    host: ${mkcs.rabbitmq.host}
+    port: ${mkcs.rabbitmq.port}
+    username: ${mkcs.rabbitmq.username}
+    password: ${mkcs.rabbitmq.password}
+    virtual-host: ${mkcs.rabbitmq.virtual-host}
+    listener:
+      simple:
+        acknowledge-mode: auto
+        prefetch: 1
+        concurrency: 3
+        max-concurrency: 10
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000ms
+  mail:
+    host: ${mkcs.mail.host}
+    port: ${mkcs.mail.port}
+    username: ${mkcs.mail.username}
+    password: ${mkcs.mail.password}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
 ############## Sa-Token 配置 (文档: https://sa-token.cc) ##############
 sa-token:

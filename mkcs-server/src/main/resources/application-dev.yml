@@ -16,3 +16,16 @@ mkcs:
     secret-key: minioadmin
     endpoint: http://127.0.0.1:9000
     bucket-name: sky-take-out
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: admin
+    password: 123456
+    virtual-host: /
+  mail:
+    host: smtp.resend.com
+    port: 587
+    username: resend
+    password: re_RHoMZKbQ_Cif3weqijmyykMtsok8iAnXf
+    from: noreply@20051215.xyz
+    from-name: MK Cloud Storage

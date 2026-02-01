@@ -122,6 +122,18 @@ public class Assert {
     }
     
     /**
+     * 断言表达式为真，为假则抛出异常（带自定义消息）
+     * @param expression 表达式
+     * @param resultCode 结果码
+     * @param message 自定义异常消息
+     */
+    public static void isTrue(boolean expression, ResultCode resultCode, String message) {
+        if (!expression) {
+            throw new BusinessException(resultCode.getCode(), message);
+        }
+    }
+    
+    /**
      * 断言表达式为假，为真则抛出异常
      * @param expression 表达式
      * @param message 异常消息

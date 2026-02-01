@@ -27,9 +27,9 @@ public class LoginRequest {
     /**
      * 记住我
      * true: 长期有效（7天）
-     * false: 短期有效（2小时）
+     * false: 短期有效（6小时）
      */
-    private Boolean rememberMe = false;
+    private Boolean rememberMe;
     
     /**
      * 验证码（可选）

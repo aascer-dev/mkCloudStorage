@@ -31,6 +31,8 @@
         <mysql-connector-j>9.1.0</mysql-connector-j>
         <lombok>1.18.30</lombok>
         <aws.sdk>2.39.2</aws.sdk>
+        <springdoc-openapi>2.7.0</springdoc-openapi>
+        <spring-security-crypto>6.4.2</spring-security-crypto>
     </properties>
 
     <dependencyManagement>
@@ -113,16 +115,17 @@
             <dependency>
                 <groupId>org.springdoc</groupId>
                 <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-                <version>2.7.0</version>
+                <version>${springdoc-openapi}</version>
             </dependency>
 
             <!-- Spring Security Crypto -->
             <dependency>
                 <groupId>org.springframework.security</groupId>
                 <artifactId>spring-security-crypto</artifactId>
-                <version>6.4.2</version>
+                <version>${spring-security-crypto}</version>
             </dependency>
 
+            <!-- AWS SDK BOM -->
             <dependency>
                 <groupId>software.amazon.awssdk</groupId>
                 <artifactId>bom</artifactId>
