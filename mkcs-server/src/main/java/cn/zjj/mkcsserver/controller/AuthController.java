@@ -11,6 +11,10 @@ import cn.zjj.mkcsmodel.dto.LoginRequest;
 import cn.zjj.mkcsmodel.dto.RegisterRequest;
 import cn.zjj.mkcsmodel.vo.LoginResponse;
 import cn.zjj.mkcsserver.service.VerificationCodeService;
+import cn.zjj.mkcsserver.service.OAuth2Service;
+import cn.zjj.mkcsmodel.dto.OAuth2CallbackRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import com.zjj.mkcscommon.Assert;
 import com.zjj.mkcscommon.enumeration.ResultCode;
 import com.zjj.mkcscommon.result.Result;
@@ -24,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -39,6 +44,10 @@ public class AuthController {
 
     private final UsersService usersService;
     private final VerificationCodeService verificationCodeService;
+    private final OAuth2Service oauth2Service;
+    
+    @Value("${oauth2.frontend-callback-url:/oauth2-demo.html}")
+    private String frontendCallbackUrl;
 
     /**
      * 用户注册
@@ -218,5 +227,200 @@ public class AuthController {
         data.put("remainingSeconds", remainingSeconds);
 
         return Result.success(data);
+    }
+
+    // ==================== OAuth2 相关接口 ====================
+
+    /**
+     * 获取 GitHub OAuth2 授权 URL
+     */
+    @GetMapping("/oauth2/github/authorize")
+    @Operation(summary = "获取 GitHub 授权 URL", description = "获取 GitHub OAuth2 授权链接，用于跳转到 GitHub 登录页面")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "获取成功")
+    })
+    public Result<Map<String, String>> getGitHubAuthUrl(@RequestParam(required = false) String state) {
+        String authUrl = oauth2Service.getGitHubAuthorizationUrl(state);
+
+        Map<String, String> data = new HashMap<>();
+        data.put("authUrl", authUrl);
+
+        return Result.success("获取授权链接成功", data);
+    }
+
+    /**
+     * GitHub OAuth2 回调处理
+     */
+    @PostMapping("/oauth2/github/callback")
+    @Operation(summary = "GitHub OAuth2 回调", description = "处理 GitHub OAuth2 授权回调，完成登录或注册")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "登录成功或需要注册"),
+            @ApiResponse(responseCode = "400", description = "授权失败")
+    })
+    public Result<?> handleGitHubCallback(@Valid @RequestBody OAuth2CallbackRequest request) {
+        return oauth2Service.handleGitHubCallback(request.getCode(), request.getState(), request.getRememberMe());
+    }
+
+    /**
+     * GitHub OAuth2 回调处理（GET 方式，用于浏览器重定向）
+     */
+    @GetMapping("/oauth2/github/callback")
+    @Operation(summary = "GitHub OAuth2 回调（GET）", description = "处理 GitHub OAuth2 授权回调（浏览器重定向方式）")
+    public void handleGitHubCallbackGet(
+            @RequestParam String code,
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false, defaultValue = "false") Boolean rememberMe,
+            HttpServletResponse response) throws IOException {
+        
+        try {
+            // 处理 GitHub 回调
+            Result<?> result = oauth2Service.handleGitHubCallback(code, state, rememberMe);
+            
+            if (result.getCode() == 200) {
+                Object data = result.getData();
+                
+                // Check if it's a login response or registration required
+                if (data instanceof LoginResponse) {
+                    LoginResponse loginResponse = (LoginResponse) data;
+                    
+                    // 构建重定向 URL，将 token 和用户信息传递给前端
+                    String redirectUrl = String.format(
+                        "%s?token=%s&userId=%d&username=%s&success=true",
+                        frontendCallbackUrl,
+                        loginResponse.getToken(),
+                        loginResponse.getId(),
+                        loginResponse.getUsername()
+                    );
+                    
+                    log.info("GitHub OAuth2 登录成功，重定向到前端: {}", redirectUrl);
+                    response.sendRedirect(redirectUrl);
+                } else if (data instanceof Map) {
+                    // Registration required
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> regData = (Map<String, Object>) data;
+                    
+                    String redirectUrl = String.format(
+                        "%s?requiresRegistration=true&tempUserId=%s&suggestedEmail=%s&suggestedUsername=%s&hasGitHubEmail=%s",
+                        frontendCallbackUrl,
+                        regData.get("tempUserId"),
+                        java.net.URLEncoder.encode(String.valueOf(regData.get("suggestedEmail")), "UTF-8"),
+                        java.net.URLEncoder.encode(String.valueOf(regData.get("suggestedUsername")), "UTF-8"),
+                        regData.get("hasGitHubEmail")
+                    );
+                    
+                    log.info("GitHub OAuth2 新用户，需要注册，重定向到前端: {}", redirectUrl);
+                    response.sendRedirect(redirectUrl);
+                }
+            } else {
+                // 登录失败，重定向到前端错误页面
+                String errorUrl = String.format(
+                    "%s?success=false&error=%s",
+                    frontendCallbackUrl,
+                    java.net.URLEncoder.encode(result.getMessage(), "UTF-8")
+                );
+                
+                log.error("GitHub OAuth2 登录失败: {}", result.getMessage());
+                response.sendRedirect(errorUrl);
+            }
+        } catch (Exception e) {
+            log.error("GitHub OAuth2 回调处理失败", e);
+            
+            // 异常情况，重定向到前端错误页面
+            String errorUrl = String.format(
+                "%s?success=false&error=%s",
+                frontendCallbackUrl,
+                java.net.URLEncoder.encode("登录失败: " + e.getMessage(), "UTF-8")
+            );
+            
+            response.sendRedirect(errorUrl);
+        }
+    }
+
+    /**
+     * 发送邮箱验证码
+     */
+    @PostMapping("/oauth2/send-verification-code")
+    @Operation(summary = "发送邮箱验证码", description = "为 OAuth2 注册发送邮箱验证码")
+    public Result<Void> sendVerificationCode(
+            @RequestParam String tempUserId,
+            @RequestParam String email) {
+        return oauth2Service.sendVerificationCode(tempUserId, email);
+    }
+
+    /**
+     * 验证邮箱
+     */
+    @PostMapping("/oauth2/verify-email")
+    @Operation(summary = "验证邮箱", description = "验证 OAuth2 注册邮箱（GitHub 邮箱或自定义邮箱）")
+    public Result<Void> verifyEmail(
+            @RequestParam String tempUserId,
+            @RequestParam String email,
+            @RequestParam(required = false) String code,
+            @RequestParam(required = false, defaultValue = "false") Boolean isGitHubEmail) {
+        
+        if (Boolean.TRUE.equals(isGitHubEmail)) {
+            // GitHub email - no code needed
+            return oauth2Service.verifyGitHubEmail(tempUserId);
+        } else {
+            // Custom email - requires code
+            return oauth2Service.verifyEmailWithCode(tempUserId, email, code);
+        }
+    }
+
+    /**
+     * 完成 OAuth2 注册
+     */
+    @PostMapping("/oauth2/complete-registration")
+    @Operation(summary = "完成 OAuth2 注册", description = "完成 OAuth2 用户注册（用户名选择）")
+    public Result<LoginResponse> completeRegistration(
+            @RequestParam String tempUserId,
+            @RequestParam String username,
+            @RequestParam(required = false, defaultValue = "false") Boolean rememberMe) {
+        return oauth2Service.completeOAuth2Registration(tempUserId, username, rememberMe);
+    }
+
+    /**
+     * 发起账号合并
+     */
+    @PostMapping("/oauth2/initiate-merge")
+    @Operation(summary = "发起账号合并", description = "检测邮箱冲突并发起账号合并流程")
+    public Result<Map<String, Object>> initiateMerge(
+            @RequestParam String tempUserId,
+            @RequestParam String email) {
+        return oauth2Service.initiateAccountMerge(tempUserId, email);
+    }
+
+    /**
+     * 完成账号合并
+     */
+    @PostMapping("/oauth2/complete-merge")
+    @Operation(summary = "完成账号合并", description = "在用户通过账号恢复验证后完成账号合并")
+    public Result<LoginResponse> completeMerge(
+            @RequestParam String tempUserId,
+            @RequestParam Long existingUserId,
+            @RequestParam(required = false, defaultValue = "false") Boolean rememberMe) {
+        return oauth2Service.completeAccountMerge(tempUserId, existingUserId, rememberMe);
+    }
+    
+    /**
+     * 获取用户的 OAuth2 绑定列表
+     */
+    @GetMapping("/oauth2/bindings")
+    @Operation(summary = "获取 OAuth2 绑定列表", description = "获取当前用户的所有 OAuth2 绑定")
+    public Result<Map<String, Object>> getOAuthBindings() {
+        StpUtil.checkLogin();
+        Long userId = Long.parseLong((String) StpUtil.getLoginId());
+        return oauth2Service.getUserOAuthBindings(userId);
+    }
+    
+    /**
+     * 解除 OAuth2 绑定
+     */
+    @DeleteMapping("/oauth2/bindings/{provider}")
+    @Operation(summary = "解除 OAuth2 绑定", description = "解除指定平台的 OAuth2 绑定")
+    public Result<Void> unbindOAuth(@PathVariable String provider) {
+        StpUtil.checkLogin();
+        Long userId = Long.parseLong((String) StpUtil.getLoginId());
+        return oauth2Service.unbindOAuth(userId, provider);
     }
 }

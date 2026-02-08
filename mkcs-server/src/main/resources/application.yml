@@ -9,6 +9,9 @@ logging:
     root: INFO
     web: INFO
     org.springframework: WARN
+    # 禁用静态资源未找到的警告
+    org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: ERROR
+    org.springframework.web.servlet.resource: ERROR
 spring:
   profiles:
     # 当前激活的环境配置，指向 application-dev.yml
@@ -16,6 +19,20 @@ spring:
   main:
     allow-circular-references: true
     allow-bean-definition-overriding: true
+  # 禁用 favicon 警告
+  mvc:
+    favicon:
+      enabled: false
+    throw-exception-if-no-handler-found: false
+  servlet:
+    multipart:
+      # 单个文件的最大限制
+      max-file-size: 5MB
+      # 单次请求的总限制（包含表单其他字段）
+      max-request-size: 5MB
+  web:
+    resources:
+      add-mappings: true
   datasource:
     # 使用 Druid 数据源；具体连接信息来自 mkcs.* 外部配置
     type: com.alibaba.druid.pool.DruidDataSource

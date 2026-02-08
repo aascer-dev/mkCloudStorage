@@ -38,6 +38,8 @@ public enum ResultCode {
     USER_DISABLED(1102, "用户已被禁用"),
     PASSWORD_ERROR(1103, "密码错误"),
     EMAIL_EXISTS(1104, "邮箱已存在"),
+    USERNAME_ALREADY_EXISTS(1105, "用户名已存在"),
+    EMAIL_ALREADY_EXISTS(1106, "邮箱已被使用"),
     
     // 认证相关错误
     TOKEN_INVALID(2001, "Token无效"),
@@ -45,6 +47,17 @@ public enum ResultCode {
     LOGIN_FAILED(2003, "登录失败"),
     PERMISSION_DENIED(2004, "权限不足"),
     NOT_LOGIN(2005, "用户未登录"),
+    
+    // OAuth2 相关错误
+    OAUTH_STATE_INVALID(2101, "OAuth2 state 参数无效"),
+    OAUTH_TEMP_DATA_EXPIRED(2102, "OAuth2 临时数据已过期，请重新登录"),
+    OAUTH_ALREADY_LINKED(2103, "该 OAuth 账号已绑定到其他用户"),
+    EMAIL_FORMAT_INVALID(2104, "邮箱格式不正确"),
+    EMAIL_NOT_VERIFIED(2105, "邮箱未验证"),
+    EMAIL_NOT_PROVIDED(2106, "GitHub 未提供邮箱"),
+    VERIFICATION_CODE_EXPIRED(2107, "验证码已过期"),
+    VERIFICATION_CODE_INVALID(2108, "验证码不正确"),
+    EMAIL_SEND_FAILED(2109, "验证码发送失败"),
     
     // 参数相关错误
     PARAM_MISSING(3001, "缺少必要参数"),

@@ -3,6 +3,7 @@ package cn.zjj.mkcsserver.service.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.zjj.mkcsmodel.dto.LoginRequest;
 import cn.zjj.mkcsmodel.dto.RegisterRequest;
+import cn.zjj.mkcsmodel.dto.UpdateUserRequest;
 import cn.zjj.mkcsmodel.entity.UserRoles;
 import cn.zjj.mkcsmodel.entity.Users;
 import cn.zjj.mkcsmodel.vo.LoginResponse;
@@ -40,9 +41,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements UsersService {
 
-    private static final String SESSION_ROLE_LIST_KEY = "roleList";
-    private static final String SESSION_PERMISSION_LIST_KEY = "permList";
-
     private final PasswordEncoder passwordEncoder;
     private final StorageBucketsService storageBucketsService;
     private final UserRolesService userRolesService;
@@ -65,9 +63,6 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
 
         // 根据记住我设置不同的超时时间
         StpUtil.login(user.getId(), loginRequest.getRememberMe() ? 14 * 24 * 60 * 60 : 6 * 60 * 60);
-
-        // 缓存角色/权限到 TokenSession
-        cacheRolePermissionToSession(user.getId());
 
         // 构建登录响应
         LoginResponse loginResponse = UserConverter.toLoginResponse(user, loginRequest.getRememberMe());
@@ -122,22 +117,9 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         boolean rememberMe = Boolean.TRUE.equals(registerRequest.getRememberMe());
         StpUtil.login(user.getId(), rememberMe ? 14 * 24 * 60 * 60 : 6 * 60 * 60);
 
-        // 缓存角色/权限到 TokenSession
-        cacheRolePermissionToSession(user.getId());
-
         LoginResponse loginResponse = UserConverter.toLoginResponse(user, rememberMe);
 
         return Result.success("注册成功", loginResponse);
-    }
-
-    private void cacheRolePermissionToSession(Long userId) {
-        if (userId == null) {
-            return;
-        }
-        List<String> roles = userRolesService.getUserRoleNames(userId);
-        List<String> permissions = userRolesService.getUserPermissionNames(userId);
-        StpUtil.getSessionByLoginId(userId).set(SESSION_ROLE_LIST_KEY, roles);
-        StpUtil.getSessionByLoginId(userId).set(SESSION_PERMISSION_LIST_KEY, permissions);
     }
 
     // ==================== 用户查询方法 ====================
@@ -305,5 +287,56 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
     public boolean isEmailAvailable(String email, Long excludeUserId) {
         Assert.hasText(email, "邮箱不能为空");
         return !baseMapper.existsEmailExcludeId(email, excludeUserId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<LoginResponse> updateUserInfo(Long userId, UpdateUserRequest updateRequest) {
+        Assert.notNull(userId, "用户ID不能为空");
+        Assert.notNull(updateRequest, "更新请求不能为空");
+        
+        // 1. 验证用户存在
+        Users user = getById(userId);
+        Assert.notNull(user, ResultCode.USER_NOT_FOUND);
+        
+        // 2. 验证邮箱唯一性（如果要更新邮箱）
+        if (updateRequest.getEmail() != null && !updateRequest.getEmail().trim().isEmpty()) {
+            String newEmail = updateRequest.getEmail().trim();
+            // 如果邮箱有变化，检查是否已被其他用户使用
+            if (!newEmail.equals(user.getEmail())) {
+                if (!isEmailAvailable(newEmail, userId)) {
+                    return Result.error(ResultCode.EMAIL_ALREADY_EXISTS);
+                }
+                user.setEmail(newEmail);
+            }
+        }
+        
+        // 3. 更新昵称
+        if (updateRequest.getNickname() != null && !updateRequest.getNickname().trim().isEmpty()) {
+            user.setNickname(updateRequest.getNickname().trim());
+        }
+        
+        // 4. 更新头像URL
+        if (updateRequest.getAvatarUrl() != null) {
+            user.setAvatarUrl(updateRequest.getAvatarUrl());
+        }
+        
+        // 5. 更新当前存储桶ID
+        if (updateRequest.getCurrentBucketId() != null) {
+            user.setCurrentBucketId(updateRequest.getCurrentBucketId());
+        }
+        
+        // 6. 保存更新
+        boolean success = updateById(user);
+        Assert.isTrue(success, ResultCode.OPERATION_FAILED, "更新用户信息失败");
+        
+        // 7. 返回更新后的用户信息
+        Users updatedUser = getById(userId);
+        LoginResponse response = UserConverter.toLoginResponse(updatedUser, false);
+        
+        log.info("用户信息更新成功: userId={}, nickname={}, email={}", 
+                userId, updatedUser.getNickname(), updatedUser.getEmail());
+        
+        return Result.success("用户信息更新成功", response);
     }
 }

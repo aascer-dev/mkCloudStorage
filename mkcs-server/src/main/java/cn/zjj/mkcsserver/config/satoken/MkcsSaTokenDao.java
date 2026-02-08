@@ -3,9 +3,12 @@ package cn.zjj.mkcsserver.config.satoken;
 import cn.dev33.satoken.dao.SaTokenDao;
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.util.SaFoxUtil;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisTemplate;import org.springframework.stereotype.Component;
+import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
+import com.zjj.mkcscommon.json.JacksonObjectMapper;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -14,21 +17,35 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Sa-Token 持久层实现类 - Redis版本
- * 
+ * Sa-Token 持久层实现类 - Redis版本 (针对复杂对象序列化优化)
+ *
  * @author zjj
  */
 @Component
 public class MkcsSaTokenDao implements SaTokenDao {
 
-
     private final RedisTemplate<String, Object> redisTemplate;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    /**
+     * 专用于 Redis 存储的 ObjectMapper
+     * 必须开启 DefaultTyping，否则 SaSession 中的 List<String> 反序列化后会变成 List<Object> 或 LinkedHashMap，
+     * 导致 hasPermission 鉴权失败。
+     */
+    private final ObjectMapper redisObjectMapper;
 
     public MkcsSaTokenDao(RedisTemplate<String, Object> redisTemplate) {
         this.redisTemplate = redisTemplate;
+
+        // 1. 基于你现有的配置创建一个新的 Mapper 实例
+        this.redisObjectMapper = new JacksonObjectMapper();
+
+        // 2. 关键：开启 DefaultTyping，保存多态类型信息
+        // 指定序列化时将类名写入 JSON，例如：["java.util.ArrayList", ["user.add"]]
+        this.redisObjectMapper.activateDefaultTyping(
+                LaissezFaireSubTypeValidator.instance,
+                ObjectMapper.DefaultTyping.NON_FINAL,
+                JsonTypeInfo.As.PROPERTY
+        );
     }
 
     // ----------------- String 读写 -----------------
@@ -94,42 +111,58 @@ public class MkcsSaTokenDao implements SaTokenDao {
         }
     }
 
-    // ----------------- Object 读写 -----------------
+    // ----------------- Object 读写 (核心修改部分) -----------------
 
     @Override
     public Object getObject(String key) {
         if (key == null) {
             return null;
         }
-        return redisTemplate.opsForValue().get(key);
+        Object obj = redisTemplate.opsForValue().get(key);
+        // 如果 Redis 中存的是 JSON 字符串，尝试解析
+        if (obj instanceof String) {
+            try {
+                // 读取为 Object，利用 DefaultTyping 自动推断类型
+                return redisObjectMapper.readValue((String) obj, Object.class);
+            } catch (Exception e) {
+                // 如果解析失败，说明可能就是个普通字符串，直接返回
+                return obj;
+            }
+        }
+        return obj;
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public <T> T getObject(String key, Class<T> cs) {
         if (key == null || cs == null) {
             return null;
         }
-        
+
         Object obj = redisTemplate.opsForValue().get(key);
         if (obj == null) {
             return null;
         }
-        
-        // 如果已经是目标类型，直接返回
+
+        // 1. 如果已经是目标类型，直接返回
         if (cs.isInstance(obj)) {
-            return (T) obj;
+            @SuppressWarnings("unchecked")
+            T t = (T) obj;
+            return t;
         }
-        
-        // 尝试 JSON 反序列化
+
+        // 2. 如果是 JSON String，使用配置好的 Mapper 反序列化
         try {
             if (obj instanceof String) {
-                return objectMapper.readValue((String) obj, cs);
+                return redisObjectMapper.readValue((String) obj, cs);
             }
-            // 其他类型转换
-            return objectMapper.convertValue(obj, cs);
+
+            // 3. 兜底：如果是其他类型（如 LinkedHashMap），先转 JSON 再转目标对象
+            // 这种情况通常发生在 RedisTemplate 默认序列化器已经做了一层转换，但类型不对
+            String json = redisObjectMapper.writeValueAsString(obj);
+            return redisObjectMapper.readValue(json, cs);
+
         } catch (Exception e) {
-            throw new RuntimeException("Failed to convert object to " + cs.getName(), e);
+            throw new RuntimeException("SaTokenDao Object反序列化失败，Key: " + key, e);
         }
     }
 
@@ -138,10 +171,18 @@ public class MkcsSaTokenDao implements SaTokenDao {
         if (key == null || object == null) {
             return;
         }
-        if (timeout == SaTokenDao.NEVER_EXPIRE) {
-            redisTemplate.opsForValue().set(key, object);
-        } else {
-            redisTemplate.opsForValue().set(key, object, Duration.ofSeconds(timeout));
+        try {
+            // 重点：手动序列化为 JSON 字符串存储
+            // 这样可以确保我们的 activateDefaultTyping 配置生效，保存类型信息
+            String jsonValue = redisObjectMapper.writeValueAsString(object);
+
+            if (timeout == SaTokenDao.NEVER_EXPIRE) {
+                redisTemplate.opsForValue().set(key, jsonValue);
+            } else {
+                redisTemplate.opsForValue().set(key, jsonValue, Duration.ofSeconds(timeout));
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("SaTokenDao Object序列化失败，Key: " + key, e);
         }
     }
 
@@ -231,12 +272,12 @@ public class MkcsSaTokenDao implements SaTokenDao {
         if (keyword == null) {
             keyword = "";
         }
-        
+
         Set<String> keys = redisTemplate.keys(prefix + "*" + keyword + "*");
         if (keys == null) {
             return new ArrayList<>();
         }
-        
+
         List<String> list = new ArrayList<>(keys);
         return SaFoxUtil.searchList(list, start, size, sortType);
     }
@@ -245,11 +286,11 @@ public class MkcsSaTokenDao implements SaTokenDao {
 
     @Override
     public void init() {
-        // 初始化操作，如果需要的话
+        // 初始化操作
     }
 
     @Override
     public void destroy() {
-        // 销毁操作，如果需要的话
+        // 销毁操作
     }
 }

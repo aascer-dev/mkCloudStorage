@@ -1,14 +1,20 @@
 package cn.zjj.mkcsserver.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.stp.StpUtil;
 import cn.zjj.mkcsmodel.entity.Users;
 import cn.zjj.mkcsserver.service.UsersService;
 import com.zjj.mkcscommon.result.Result;
+import com.zjj.mkcscommon.utils.MinIOUtil;
+import com.zjj.mkcscommon.utils.RbacUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.UUID;
 
 /**
  * 用户管理控制器 - 演示自动填充功能
@@ -21,45 +27,16 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UsersService usersService;
+    private final MinIOUtil minIOUtil;
 
-    /**
-     * 创建用户 - 演示插入时自动填充
-     */
-    @PostMapping
-    @Operation(summary = "创建用户", description = "创建新用户，演示插入时自动填充创建时间、更新时间、创建人、更新人")
-    public Result<Users> createUser(@RequestBody Users user) {
-        log.info("创建用户: {}", user);
-        
-        // 保存用户，自动填充字段会被 MyMetaObjectHandler 处理
-        boolean success = usersService.save(user);
-        
-        if (success) {
-            return Result.success("用户创建成功", user);
-        } else {
-            return Result.error("用户创建失败");
-        }
-    }
+    // avatar 桶名称常量
+    private static final String AVATAR_BUCKET = "avatar";
+    // 允许的图片类型
+    private static final String[] ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"};
+    // 最大文件大小：5MB
+    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
 
-    /**
-     * 更新用户 - 演示更新时自动填充
-     */
-    @PutMapping("/{id}")
-    @SaCheckLogin
-    @Operation(summary = "更新用户", description = "更新用户信息，演示更新时自动填充更新时间、更新人")
-    public Result<Users> updateUser(@PathVariable Long id, @RequestBody Users user) {
-        log.info("更新用户 ID: {}, 数据: {}", id, user);
-        
-        user.setId(id);
-        // 更新用户，自动填充字段会被 MyMetaObjectHandler 处理
-        boolean success = usersService.updateById(user);
-        
-        if (success) {
-            Users updatedUser = usersService.getById(id);
-            return Result.success("用户更新成功", updatedUser);
-        } else {
-            return Result.error("用户更新失败");
-        }
-    }
+
 
     /**
      * 获取用户详情
@@ -73,5 +50,158 @@ public class UserController {
         } else {
             return Result.error("用户不存在");
         }
+    }
+
+    /**
+     * 更新用户头像 - 上传文件到MinIO
+     */
+    @PostMapping("/{id}/avatar")
+    @SaCheckLogin
+    @Operation(summary = "更新用户头像", description = "上传头像文件到MinIO的avatar桶，需要 user:updateAvatar 权限")
+    public Result<Users> updateAvatar(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) {
+
+        log.info("更新用户头像 - 用户ID: {}, 文件名: {}, 文件大小: {} bytes",
+                id, file.getOriginalFilename(), file.getSize());
+
+        // 1. 获取当前登录用户ID
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+
+        // 2. 检查是否是本人
+        boolean isSelf = currentUserId.equals(id);
+        
+        // 3. 权限检查
+        if (isSelf) {
+            // 更新自己的头像：需要 user:updateAvatar 权限
+            boolean hasPermission = RbacUtil.hasPermission("user:updateAvatar");
+            log.info("用户 {} 更新自己的头像 - hasPermission: {}", currentUserId, hasPermission);
+            
+            if (!hasPermission) {
+                log.warn("用户 {} 无 user:updateAvatar 权限", currentUserId);
+                return Result.error("无权限更新头像，请联系管理员");
+            }
+        } else {
+            // 更新他人的头像：需要管理员权限
+            boolean isAdmin = RbacUtil.isAdmin();
+            boolean isSuperAdmin = RbacUtil.isSuperAdmin();
+            log.info("用户 {} 尝试更新用户 {} 的头像 - isAdmin: {}, isSuperAdmin: {}", 
+                    currentUserId, id, isAdmin, isSuperAdmin);
+            
+            if (!isAdmin && !isSuperAdmin) {
+                log.warn("用户 {} 不是管理员，无法更新他人头像", currentUserId);
+                return Result.error("只有管理员可以更新他人头像");
+            }
+        }
+
+        // 4. 验证用户是否存在
+        Users user = usersService.getById(id);
+        if (user == null) {
+            return Result.error("用户不存在");
+        }
+
+        // 5. 验证文件
+        if (file.isEmpty()) {
+            return Result.error("上传文件不能为空");
+        }
+
+        // 6. 验证文件大小
+        if (file.getSize() > MAX_FILE_SIZE) {
+            return Result.error("文件大小不能超过5MB");
+        }
+
+        // 7. 验证文件类型
+        String contentType = file.getContentType();
+        boolean isValidType = false;
+        if (contentType != null) {
+            for (String allowedType : ALLOWED_IMAGE_TYPES) {
+                if (contentType.equalsIgnoreCase(allowedType)) {
+                    isValidType = true;
+                    break;
+                }
+            }
+        }
+        if (!isValidType) {
+            return Result.error("只支持上传图片文件（JPEG、PNG、GIF、WebP）");
+        }
+
+        // 8. 确保avatar桶存在
+        try {
+            if (!minIOUtil.bucketExists(AVATAR_BUCKET)) {
+                log.info("avatar桶不存在，正在创建...");
+                boolean created = minIOUtil.createBucket(AVATAR_BUCKET);
+                if (!created) {
+                    log.error("创建avatar桶失败");
+                    return Result.error("存储桶创建失败");
+                }
+                log.info("avatar桶创建成功");
+            }
+        } catch (Exception e) {
+            log.error("检查或创建avatar桶时出错: {}", e.getMessage(), e);
+            return Result.error("存储服务异常");
+        }
+
+        // 9. 生成唯一的对象名称
+        String originalFilename = file.getOriginalFilename();
+        String fileExtension = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        }
+        String objectName = "user_" + id + "_" + UUID.randomUUID().toString() + fileExtension;
+
+        // 10. 上传文件到MinIO的avatar桶
+        String avatarUrl;
+        try {
+            avatarUrl = minIOUtil.upload(file, AVATAR_BUCKET, objectName);
+            log.info("头像上传成功 - 用户ID: {}, 对象名: {}, URL: {}", id, objectName, avatarUrl);
+        } catch (Exception e) {
+            log.error("上传头像到MinIO失败: {}", e.getMessage(), e);
+            return Result.error("头像上传失败");
+        }
+
+        // 11. 删除旧头像（可选）
+        if (user.getAvatarUrl() != null && !user.getAvatarUrl().isEmpty()) {
+            try {
+                // 从URL中提取对象名称
+                String oldAvatarUrl = user.getAvatarUrl();
+                if (oldAvatarUrl.contains(AVATAR_BUCKET + "/")) {
+                    String oldObjectName = oldAvatarUrl.substring(
+                            oldAvatarUrl.indexOf(AVATAR_BUCKET + "/") + AVATAR_BUCKET.length() + 1);
+                    minIOUtil.deleteObject(AVATAR_BUCKET, oldObjectName);
+                    log.info("旧头像已删除: {}", oldObjectName);
+                }
+            } catch (Exception e) {
+                log.warn("删除旧头像失败（不影响新头像上传）: {}", e.getMessage());
+            }
+        }
+
+        // 12. 更新用户头像URL
+        user.setAvatarUrl(avatarUrl);
+        boolean success = usersService.updateById(user);
+
+        if (success) {
+            Users updatedUser = usersService.getById(id);
+            log.info("用户头像更新成功 - 用户ID: {}", id);
+            return Result.success("头像更新成功", updatedUser);
+        } else {
+            return Result.error("头像更新失败");
+        }
+    }
+
+    /**
+     * 更新当前用户信息
+     */
+    @PutMapping("/profile")
+    @SaCheckLogin
+    @Operation(summary = "更新当前用户信息", description = "更新当前登录用户的个人信息（昵称、邮箱等）")
+    public Result<cn.zjj.mkcsmodel.vo.LoginResponse> updateProfile(
+            @RequestBody @jakarta.validation.Valid cn.zjj.mkcsmodel.dto.UpdateUserRequest updateRequest) {
+        
+        // 获取当前登录用户ID
+        Long currentUserId = cn.dev33.satoken.stp.StpUtil.getLoginIdAsLong();
+        
+        log.info("更新用户信息 - 用户ID: {}, 请求: {}", currentUserId, updateRequest);
+        
+        return usersService.updateUserInfo(currentUserId, updateRequest);
     }
 }

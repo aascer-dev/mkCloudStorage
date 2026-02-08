@@ -28,13 +28,17 @@ public class SaTokenExceptionHandler {
         return new SaServletFilter()
             // 指定[拦截路由]与[放行路由]
             .addInclude("/**")
-            .addExclude("/favicon.ico")
+            //.addExclude("/favicon.ico")
             .addExclude("/swagger-ui/**")    // 排除 Swagger UI
             .addExclude("/swagger-ui.html")  // 排除 Swagger UI 页面
             .addExclude("/v3/api-docs/**")   // 排除 OpenAPI 文档
             .addExclude("/v3/api-docs")      // 排除 OpenAPI 文档根路径
             .addExclude("/swagger-resources/**") // 排除 Swagger 资源
             .addExclude("/webjars/**")       // 排除静态资源
+            .addExclude("/static/**")        // 排除 static 目录
+            .addExclude("/*.html")           // 排除根目录下的 HTML 文件
+            .addExclude("/*.css")            // 排除根目录下的 CSS 文件
+            .addExclude("/*.js")             // 排除根目录下的 JS 文件
 
             
             // 认证函数: 每次请求执行
@@ -42,7 +46,7 @@ public class SaTokenExceptionHandler {
                 SaRouter.match("/**")
                     .notMatch("/api/auth/**")    // 排除认证相关接口
                     .notMatch("/error")          // 排除错误页面
-                    .notMatch("/favicon.ico")    // 排除网站图标
+                    //.notMatch("/favicon.ico")    // 排除网站图标
                     // SpringDoc OpenAPI 相关路径排除
                     .notMatch("/swagger-ui/**")  // 排除 Swagger UI
                     .notMatch("/swagger-ui.html") // 排除 Swagger UI 页面
@@ -50,6 +54,11 @@ public class SaTokenExceptionHandler {
                     .notMatch("/v3/api-docs")    // 排除 OpenAPI 文档根路径
                     .notMatch("/swagger-resources/**") // 排除 Swagger 资源
                     .notMatch("/webjars/**")     // 排除静态资源
+                    // 静态资源排除
+                    .notMatch("/static/**")      // 排除 static 目录
+                    .notMatch("/*.html")         // 排除根目录下的 HTML 文件
+                    .notMatch("/*.css")          // 排除根目录下的 CSS 文件
+                    .notMatch("/*.js")           // 排除根目录下的 JS 文件
                     .check(r -> StpUtil.checkLogin());
             })
             

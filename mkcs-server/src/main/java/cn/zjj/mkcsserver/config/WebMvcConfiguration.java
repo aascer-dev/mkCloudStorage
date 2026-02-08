@@ -1,5 +1,7 @@
 package cn.zjj.mkcsserver.config;
 
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import com.zjj.mkcscommon.json.JacksonObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -33,7 +35,7 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
         // Configure static resource access
         registry.addResourceHandler("/static/**")
                 .addResourceLocations("classpath:/static/");
-        
+
         // Swagger UI static resource mapping
         registry.addResourceHandler("/swagger-ui/**")
                 .addResourceLocations("classpath:/META-INF/resources/webjars/swagger-ui/");
@@ -63,21 +65,32 @@ public class WebMvcConfiguration implements WebMvcConfigurer {
     }
 
     /**
-     * Configure JSON converter with UTF-8 encoding
+     * Json 转换器
      */
     @Bean
     public MappingJackson2HttpMessageConverter mappingJackson2HttpMessageConverter() {
         MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter();
-        converter.setObjectMapper(new JacksonObjectMapper());
-        converter.setDefaultCharset(StandardCharsets.UTF_8);
 
+        // 1. 获取你的自定义 Mapper
+        JacksonObjectMapper objectMapper = new JacksonObjectMapper();
+
+        // 2. 手动注册 Long -> String 的序列化规则（这里主要是因为JavaScript的num（16位）不够大，需要把id（Long）转换成String）
+        SimpleModule simpleModule = new SimpleModule();
+        // 针对 Long 类
+        simpleModule.addSerializer(Long.class, ToStringSerializer.instance);
+        // 针对 long 基本类型
+        simpleModule.addSerializer(Long.TYPE, ToStringSerializer.instance);
+
+        // 注册模块到你的 objectMapper
+        objectMapper.registerModule(simpleModule);
+        converter.setObjectMapper(objectMapper);
+        converter.setDefaultCharset(StandardCharsets.UTF_8);
         // Support JSON media types with UTF-8 encoding
         List<MediaType> supportedMediaTypes = new ArrayList<>();
         supportedMediaTypes.add(new MediaType("application", "json", StandardCharsets.UTF_8));
         supportedMediaTypes.add(new MediaType("application", "*+json", StandardCharsets.UTF_8));
         supportedMediaTypes.add(new MediaType("text", "json", StandardCharsets.UTF_8));
         converter.setSupportedMediaTypes(supportedMediaTypes);
-
         return converter;
     }
 

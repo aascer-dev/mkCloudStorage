@@ -149,5 +149,12 @@ public interface UsersService extends IService<Users> {
      */
     boolean isEmailAvailable(String email, Long excludeUserId);
 
+    /**
+     * 更新用户信息（使用 DTO）
+     * @param userId 用户ID
+     * @param updateRequest 更新请求
+     * @return 更新结果
+     */
+    Result<LoginResponse> updateUserInfo(Long userId, cn.zjj.mkcsmodel.dto.UpdateUserRequest updateRequest);
 
 }

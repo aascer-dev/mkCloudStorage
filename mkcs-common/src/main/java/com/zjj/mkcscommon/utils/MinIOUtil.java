@@ -87,6 +87,18 @@ public class MinIOUtil {
      * @return 文件的访问 URL
      */
     public String upload(MultipartFile file, String objectName) {
+        return upload(file, this.bucketName, objectName);
+    }
+
+    /**
+     * 上传文件到指定的 MinIO 存储桶
+     *
+     * @param file       要上传的文件
+     * @param bucketName 目标存储桶名称
+     * @param objectName 在 MinIO 中存储的对象名称
+     * @return 文件的访问 URL
+     */
+    public String upload(MultipartFile file, String bucketName, String objectName) {
         try {
             // 使用缓存的 S3Client
             S3Client client = getS3Client();
@@ -105,8 +117,7 @@ public class MinIOUtil {
 
             // 3. 将 MultipartFile 的 InputStream 包装成 RequestBody
             // 使用 fromInputStream() 方法，并提供内容长度
-            RequestBody requestBody = null;
-            requestBody = RequestBody.fromInputStream(
+            RequestBody requestBody = RequestBody.fromInputStream(
                     file.getInputStream(),
                     contentLength
             );
@@ -117,13 +128,12 @@ public class MinIOUtil {
 
         } catch (Exception e) {
             log.error("上传出错：{}", e.getMessage());
+            throw new RuntimeException("文件上传失败: " + e.getMessage(), e);
         }
         StringBuilder url = new StringBuilder(endpoint);
         url
             .append("/")
             .append(bucketName)
-            //.append(".")
-            //.append(endpoint)
             .append("/")
             .append(objectName);
         log.info("上传成功，文件访问路径: {}", url.toString());
