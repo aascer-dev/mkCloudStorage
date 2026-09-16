@@ -75,13 +75,14 @@ minio:
 ### 数据库初始化
 
 ```sql
--- 按顺序执行项目根目录下的建库脚本
-source RBAC.sql
-source file.sql
-source file_upload.sql
-source favorite.sql
-source storage_bucket.sql
+-- 数据库脚本以项目根目录 sql/ 为准
+-- 根据目标环境已有表结构，按需导入对应表的数据脚本
+SOURCE sql/roles.sql;
+SOURCE sql/permissions.sql;
+SOURCE sql/role_permissions.sql;
 ```
+
+`sql/` 是数据库脚本的唯一执行来源。项目当前未引入自动迁移工具，执行前需确认目标库的表结构与脚本匹配；不再使用 `mkcs-server/src/main/resources/db/migration/`。
 
 ### 编译与运行
 

@@ -16,6 +16,9 @@ logging:
     org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: ERROR
     org.springframework.web.servlet.resource: ERROR
 spring:
+  # Support launches from either the repository root or the mkcs-server module.
+  config:
+    import: optional:file:../.env[.properties],optional:file:./.env[.properties]
   profiles:
     # 当前激活的环境配置，指向 application-dev.yml
     active: dev

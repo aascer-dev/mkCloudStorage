@@ -21,7 +21,7 @@ mkcs:
   minio:
     access-key: ${MKCS_MINIO_ACCESS_KEY}
     secret-key: ${MKCS_MINIO_SECRET_KEY}
-    endpoint: http://127.0.0.1:9000
+    endpoint: ${MKCS_MINIO_ENDPOINT}
     bucket-name: sky-take-out
   rabbitmq:
     host: 127.0.0.1
