@@ -2,6 +2,8 @@ package cn.zjj.mkcsserver.service;
 
 import cn.zjj.mkcsmodel.dto.LoginRequest;
 import cn.zjj.mkcsmodel.dto.RegisterRequest;
+import cn.zjj.mkcsmodel.dto.ResetPasswordRequest;
+import cn.zjj.mkcsmodel.dto.UpdateUserRequest;
 import cn.zjj.mkcsmodel.entity.Users;
 import cn.zjj.mkcsmodel.vo.LoginResponse;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -155,6 +157,9 @@ public interface UsersService extends IService<Users> {
      * @param updateRequest 更新请求
      * @return 更新结果
      */
-    Result<LoginResponse> updateUserInfo(Long userId, cn.zjj.mkcsmodel.dto.UpdateUserRequest updateRequest);
+    Result<LoginResponse> updateUserInfo(Long userId, UpdateUserRequest updateRequest);
 
+    void resetPassword(ResetPasswordRequest request);
+
+    LoginResponse setUserInfo(Users user);
 }

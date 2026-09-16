@@ -9,8 +9,11 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+
 /**
  * 验证码消息监听器
+ * @author 34978
  */
 @Slf4j
 @Component
@@ -33,7 +36,7 @@ public class VerificationCodeListener {
         // 幂等性检查
         String messageIdKey = MESSAGE_ID_PREFIX + messageId;
         Boolean exists = redisTemplate.hasKey(messageIdKey);
-        if (Boolean.FALSE.equals(exists)) {
+        if (!exists) {
             log.warn("消息已处理过，跳过: messageId={}", messageId);
             return;
         }
@@ -48,7 +51,8 @@ public class VerificationCodeListener {
             log.info("验证码发送成功: email={}, type={}", email, type);
         } catch (Exception e) {
             log.error("验证码发送失败: email={}, type={}, error={}", email, type, e.getMessage(), e);
-            // 消息会重新入队重试
+            // 清除Redis key，允许消息重新入队时再次尝试处理
+            redisTemplate.delete(messageIdKey);
             throw e;
         }
     }

@@ -12,6 +12,7 @@ import software.amazon.awssdk.services.s3.model.*;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import java.io.InputStream;
 import java.net.URI;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -302,6 +303,69 @@ public class MinIOUtil {
         } catch (Exception e) {
             log.error("删除对象 {}/{} 失败: {}", bucketName, objectName, e.getMessage(), e);
             return false;
+        }
+    }
+
+    /**
+     * 获取对象的输入流
+     *
+     * @param bucketName 存储桶名称
+     * @param objectName 对象名称
+     * @return 对象的输入流
+     */
+    public InputStream getObject(String bucketName, String objectName) {
+        try {
+            S3Client client = getS3Client();
+            
+            GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(objectName)
+                    .build();
+                    
+            // AWS SDK v2返回ResponseInputStream<GetObjectResponse>，它实现了InputStream接口
+            // 可以直接使用作为InputStream
+            InputStream response = client.getObject(getObjectRequest);
+            log.info("对象 {}/{} 获取成功", bucketName, objectName);
+            return response;
+            
+        } catch (Exception e) {
+            log.error("获取对象 {}/{} 失败: {}", bucketName, objectName, e.getMessage(), e);
+            throw new RuntimeException("获取对象失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 上传流到对象
+     *
+     * @param inputStream 输入流
+     * @param bucketName 存储桶名称
+     * @param objectName 对象名称
+     * @return 文件的访问URL
+     */
+    public String uploadStream(InputStream inputStream, String bucketName, String objectName) {
+        try {
+            S3Client client = getS3Client();
+            
+            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(objectName)
+                    .build();
+
+            RequestBody requestBody = RequestBody.fromInputStream(inputStream, -1);
+            client.putObject(putObjectRequest, requestBody);
+            
+            log.info("流上传成功到: {}/{}", bucketName, objectName);
+            
+            StringBuilder url = new StringBuilder(endpoint);
+            url.append("/")
+                    .append(bucketName)
+                    .append("/")
+                    .append(objectName);
+            return url.toString();
+            
+        } catch (Exception e) {
+            log.error("流上传失败: {}", e.getMessage(), e);
+            throw new RuntimeException("流上传失败: " + e.getMessage(), e);
         }
     }
 

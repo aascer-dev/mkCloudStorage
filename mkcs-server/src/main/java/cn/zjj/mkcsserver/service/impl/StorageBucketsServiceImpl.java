@@ -10,7 +10,6 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zjj.mkcscommon.Assert;
 import com.zjj.mkcscommon.result.BusinessException;
 import com.zjj.mkcscommon.enumeration.ResultCode;
-import com.zjj.mkcscommon.utils.MinIOUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,47 +32,31 @@ import java.util.List;
 @Slf4j
 public class StorageBucketsServiceImpl extends ServiceImpl<StorageBucketsMapper, StorageBuckets> implements StorageBucketsService {
 
-    private final MinIOUtil minIOUtil;
-
     @Override
     @Transactional(rollbackFor = Exception.class)
     public StorageBuckets createBucket(String bucketName, String description, Long userId) {
         Assert.notNull(userId, "用户ID不能为空");
         Assert.hasText(bucketName, "存储桶名称不能为空");
-        
-        // 验证存储桶名称格式（MinIO要求）
+
+        // 验证存储桶名称格式
         validateBucketName(bucketName);
-        
+
         // 检查存储桶名称是否已存在
         if (!isBucketNameAvailable(bucketName, null)) {
             throw new BusinessException(ResultCode.BUCKET_NAME_EXISTS);
         }
-        
-        // 在MinIO中创建存储桶
-        boolean created = minIOUtil.createBucket(bucketName);
-        if (!created) {
-            throw new BusinessException(ResultCode.BUCKET_CREATE_FAILED);
-        }
-        
-        try {
-            // 在数据库中创建记录
-            StorageBuckets bucket = new StorageBuckets();
-            bucket.setOwnerId(userId);
-            bucket.setName(bucketName);
-            bucket.setDescription(description);
-            bucket.setStatus((byte) 1);
-            bucket.setTotalStorage(10737418240L);
-            
-            save(bucket);
-            log.info("存储桶创建成功：用户ID={}, 存储桶名称={}", userId, bucketName);
-            return bucket;
-            
-        } catch (Exception e) {
-            // 如果数据库操作失败，删除MinIO中的存储桶
-            log.error("数据库操作失败，回滚MinIO存储桶：{}", bucketName);
-            minIOUtil.deleteBucket(bucketName);
-            throw new BusinessException(ResultCode.BUCKET_CREATE_FAILED);
-        }
+
+        // 在数据库中创建记录（存储桶为逻辑概念，物理文件统一存入 MinIO 共享 files 桶）
+        StorageBuckets bucket = new StorageBuckets();
+        bucket.setOwnerId(userId);
+        bucket.setName(bucketName);
+        bucket.setDescription(description);
+        bucket.setStatus((byte) 1);
+        bucket.setTotalStorage(10737418240L);
+
+        save(bucket);
+        log.info("存储桶创建成功：用户ID={}, 存储桶名称={}", userId, bucketName);
+        return bucket;
     }
 
     @Override
@@ -93,13 +76,7 @@ public class StorageBucketsServiceImpl extends ServiceImpl<StorageBucketsMapper,
             throw new BusinessException(ResultCode.ACCESS_DENIED);
         }
         
-        // 删除MinIO中的存储桶
-        boolean deleted = minIOUtil.deleteBucket(bucket.getName());
-        if (!deleted) {
-            throw new BusinessException(ResultCode.BUCKET_DELETE_FAILED);
-        }
-        
-        // 删除数据库记录
+        // 删除数据库记录（物理文件由共享 files 桶统一管理，不按桶删除）
         boolean result = removeById(bucketId);
         if (result) {
             log.info("存储桶删除成功：用户ID={}, 存储桶ID={}, 存储桶名称={}", 
@@ -224,13 +201,10 @@ public class StorageBucketsServiceImpl extends ServiceImpl<StorageBucketsMapper,
     public StorageBuckets getDefaultBucket(Long userId) {
         // 当前实体无默认桶字段，返回最新创建的一个（示例实现）
         Assert.notNull(userId, "用户ID不能为空");
-        LambdaQueryWrapper<StorageBuckets> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(StorageBuckets::getOwnerId, userId)
-               .eq(StorageBuckets::getStatus, 1)
-               .orderByDesc(StorageBuckets::getCreatedAt)
-               .last("LIMIT 1");
-        List<StorageBuckets> list = list(wrapper);
-        return list.isEmpty() ? null : list.get(0);
+        
+        // 优化：直接从已查询的整个列表中取第一个，避免重复查询
+        List<StorageBuckets> buckets = getBucketsByUserId(userId);
+        return buckets.isEmpty() ? null : buckets.get(0);
     }
 
     @Override
@@ -263,40 +237,10 @@ public class StorageBucketsServiceImpl extends ServiceImpl<StorageBucketsMapper,
 
     @Override
     public int syncBucketsFromMinIO() {
-        try {
-            // 获取MinIO中的所有存储桶
-            List<String> minioBuckets = minIOUtil.listBuckets();
-            
-            // 获取数据库中的所有存储桶
-            List<StorageBuckets> dbBuckets = list();
-            
-            int syncCount = 0;
-            
-            // 同步MinIO中存在但数据库中不存在的存储桶
-            for (String bucketName : minioBuckets) {
-                boolean existsInDb = dbBuckets.stream()
-                        .anyMatch(bucket -> bucket.getName().equals(bucketName));
-                        
-                if (!existsInDb) {
-                    StorageBuckets bucket = new StorageBuckets();
-                    bucket.setName(bucketName);
-                    bucket.setDescription("从MinIO同步的存储桶");
-                    bucket.setOwnerId(1L);
-                    bucket.setStatus((byte) 1);
-                    
-                    save(bucket);
-                    syncCount++;
-                    log.info("同步存储桶到数据库：{}", bucketName);
-                }
-            }
-            
-            log.info("存储桶同步完成，同步数量：{}", syncCount);
-            return syncCount;
-            
-        } catch (Exception e) {
-            log.error("同步存储桶失败：{}", e.getMessage(), e);
-            return 0;
-        }
+        // 方案A：存储桶为逻辑概念，物理文件统一存入 MinIO 共享 files 桶
+        // 不同步 MinIO 桶到数据库
+        log.info("syncBucketsFromMinIO 已废弃（方案A：存储桶仅为逻辑概念）");
+        return 0;
     }
 
     /**

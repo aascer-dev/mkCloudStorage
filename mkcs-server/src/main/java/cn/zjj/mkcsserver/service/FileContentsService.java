@@ -4,13 +4,12 @@ import cn.zjj.mkcsmodel.entity.FileContents;
 import com.baomidou.mybatisplus.extension.service.IService;
 
 /**
- * <p>
- * 文件内容去重表 - 相同内容只存一份 服务类
- * </p>
- *
- * @author zjj
- * @since 2026-01-27
+ * 文件内容服务接口
  */
 public interface FileContentsService extends IService<FileContents> {
 
+    /**
+     * 根据内容hash获取文件内容
+     */
+    FileContents getByContentHash(String contentHash);
 }

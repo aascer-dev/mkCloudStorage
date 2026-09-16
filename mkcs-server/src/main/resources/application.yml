@@ -8,6 +8,9 @@ logging:
   level:
     root: INFO
     web: INFO
+    org.springframework.mail: DEBUG
+    # 开启底层 JavaMail 的交互日志
+    jakarta.mail: DEBUG
     org.springframework: WARN
     # 禁用静态资源未找到的警告
     org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: ERROR
@@ -112,12 +115,13 @@ sa-token:
     timeout: 7200               # Token 有效期（秒），-1 永久
     active-timeout: -1          # 最低活跃频率（秒），-1 不冻结
     is-concurrent: true         # 允许多地同时登录
-    is-share: false             # 多人登录同账号是否共用一个 token
-    token-style: uuid           # Token 生成策略
+    is-share: true             # 多人登录同账号是否共用一个 token
+    token-style: jwt           # Token 生成策略
+    jwt-secret-key: ${MKCS_JWT_SECRET_KEY}  # JWT 签名密钥（至少32字符）
     is-log: true                # 是否输出操作日志
     is-read-cookie: true        # 是否从 Cookie 读取 token
     is-read-header: true        # 是否从 Header 读取 token
-#    token-prefix: Bearer
+    token-prefix: Bearer        # Token 前缀
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
@@ -141,7 +145,7 @@ mkcs:
     bucket-name: ${mkcs.minio.bucket-name}
   crypto:
     default-salt: mkcs-cloud-storage-salt           # 默认盐值
-    default-password: mkcs-default-encryption-key   # 默认对称加密密钥
+    default-password: ${MKCS_CRYPTO_DEFAULT_PASSWORD}   # 默认对称加密密钥
     bcrypt-strength: 12                             # BCrypt 强度 (4-31)
 
 # SpringDoc OpenAPI / Swagger UI 配置

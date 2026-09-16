@@ -1,16 +1,15 @@
 package cn.zjj.mkcsserver.service.impl;
 
+import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.zjj.mkcsmodel.dto.OAuth2UserInfo;
 import cn.zjj.mkcsmodel.dto.RegisterRequest;
 import cn.zjj.mkcsmodel.entity.OauthIdentities;
 import cn.zjj.mkcsmodel.entity.Users;
 import cn.zjj.mkcsmodel.vo.LoginResponse;
+import cn.zjj.mkcsserver.config.satoken.StpInterfaceImpl;
 import cn.zjj.mkcsserver.converter.UserConverter;
-import cn.zjj.mkcsserver.service.EmailService;
-import cn.zjj.mkcsserver.service.OAuth2Service;
-import cn.zjj.mkcsserver.service.OauthIdentitiesService;
-import cn.zjj.mkcsserver.service.UsersService;
+import cn.zjj.mkcsserver.service.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zjj.mkcscommon.Assert;
@@ -47,6 +46,7 @@ public class OAuth2ServiceImpl implements OAuth2Service {
     private final RedisTemplate<String, Object> redisTemplate;
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
+    private final UserRolesService userRolesService;
 
     @Value("${oauth2.github.client-id:}")
     private String githubClientId;
@@ -68,8 +68,8 @@ public class OAuth2ServiceImpl implements OAuth2Service {
 
     @Override
     public String getGitHubAuthorizationUrl(String state) {
-        Assert.hasText(githubClientId, "GitHub Client ID 未配置");
-        Assert.hasText(githubRedirectUri, "GitHub Redirect URI 未配置");
+        Assert.hasText(githubClientId, "GitHub Client ID 未配置，请联系管理员");
+        Assert.hasText(githubRedirectUri, "GitHub Redirect URI 未配置，请联系管理员");
 
         // 如果未提供 state，则生成并存储
         if (state == null || state.trim().isEmpty()) {
@@ -124,6 +124,12 @@ public class OAuth2ServiceImpl implements OAuth2Service {
         return true;
     }
 
+    /**
+     * 获取Github的回调
+     * @param code 授权码
+     * @param rememberMe 是否记住登录状态
+     * @return 响应
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Result<LoginResponse> handleGitHubCallback(
@@ -144,6 +150,7 @@ public class OAuth2ServiceImpl implements OAuth2Service {
     /**
      * 处理 GitHub OAuth2 回调并验证 state
      */
+    @Override
     public Result<?> handleGitHubCallback(
         String code,
         String state,
@@ -154,7 +161,7 @@ public class OAuth2ServiceImpl implements OAuth2Service {
         // 如果提供了 state 参数，则进行验证（CSRF 保护）
         if (state != null && !state.trim().isEmpty()) {
             if (!validateAndRemoveState(state)) {
-                log.error("Invalid state parameter, possible CSRF attack");
+                log.error("非法state参数，可能是CSRF攻击: {}", state);
                 return Result.error(ResultCode.OAUTH_STATE_INVALID);
             }
         }
@@ -199,12 +206,16 @@ public class OAuth2ServiceImpl implements OAuth2Service {
                 remember ? 14 * 24 * 60 * 60 : 6 * 60 * 60
             );
 
+            // 主动加载用户角色和权限到Session
+            SaSession session = StpUtil.getSession();
+            List<String> roles = userRolesService.getUserRoleNames(user.getId());
+            List<String> permissions = userRolesService.getUserPermissionNames(user.getId());
+            session.set(StpInterfaceImpl.SESSION_ROLE_KEY, roles != null ? roles : new ArrayList<>());
+            session.set(StpInterfaceImpl.SESSION_PERMISSION_KEY, permissions != null ? permissions : new ArrayList<>());
+            session.set(StpInterfaceImpl.SESSION_USER_KEY, user);  // 存储用户信息
+
             // 构建登录响应
-            LoginResponse loginResponse = UserConverter.toLoginResponse(
-                user,
-                remember
-            );
-            return Result.success("GitHub 登录成功", loginResponse);
+            return Result.success("GitHub 登录成功", usersService.setUserInfo(user));
         } else {
             // 未关联，需要注册新用户 - 存储临时数据
             String tempUserId = storeTempOAuthData(userInfo);
@@ -443,6 +454,7 @@ public class OAuth2ServiceImpl implements OAuth2Service {
     /**
      * 发送邮箱验证码
      */
+    @Override
     public Result<Void> sendVerificationCode(String tempUserId, String email) {
         Assert.hasText(tempUserId, "临时用户ID不能为空");
         Assert.hasText(email, "邮箱不能为空");
@@ -483,6 +495,7 @@ public class OAuth2ServiceImpl implements OAuth2Service {
     /**
      * 使用验证码验证邮箱
      */
+    @Override
     public Result<Void> verifyEmailWithCode(
         String tempUserId,
         String email,
@@ -627,17 +640,21 @@ public class OAuth2ServiceImpl implements OAuth2Service {
         boolean remember = Boolean.TRUE.equals(rememberMe);
         StpUtil.login(user.getId(), remember ? 14 * 24 * 60 * 60 : 6 * 60 * 60);
 
-        LoginResponse loginResponse = UserConverter.toLoginResponse(
-            user,
-            remember
-        );
+        // 主动加载用户角色和权限到Session
+        SaSession session = StpUtil.getSession();
+        List<String> roles = userRolesService.getUserRoleNames(user.getId());
+        List<String> permissions = userRolesService.getUserPermissionNames(user.getId());
+        session.set(StpInterfaceImpl.SESSION_ROLE_KEY, roles != null ? roles : new ArrayList<>());
+        session.set(StpInterfaceImpl.SESSION_PERMISSION_KEY, permissions != null ? permissions : new ArrayList<>());
+        session.set(StpInterfaceImpl.SESSION_USER_KEY, user);  // 存储用户信息
+
         log.info(
             "OAuth2 注册完成: userId={}, username={}, email={}",
             user.getId(),
             username,
             email
         );
-        return Result.success("注册并登录成功", loginResponse);
+        return Result.success("注册并登录成功", usersService.setUserInfo(user));
     }
 
     /**
@@ -763,17 +780,21 @@ public class OAuth2ServiceImpl implements OAuth2Service {
             remember ? 14 * 24 * 60 * 60 : 6 * 60 * 60
         );
 
-        LoginResponse loginResponse = UserConverter.toLoginResponse(
-            existingUser,
-            remember
-        );
+        // 主动加载用户角色和权限到Session
+        SaSession session = StpUtil.getSession();
+        List<String> roles = userRolesService.getUserRoleNames(existingUserId);
+        List<String> permissions = userRolesService.getUserPermissionNames(existingUserId);
+        session.set(StpInterfaceImpl.SESSION_ROLE_KEY, roles != null ? roles : new ArrayList<>());
+        session.set(StpInterfaceImpl.SESSION_PERMISSION_KEY, permissions != null ? permissions : new ArrayList<>());
+        session.set(StpInterfaceImpl.SESSION_USER_KEY, existingUser);  // 存储用户信息
+
         log.info(
             "账号合并成功: userId={}, provider={}, identifier={}",
             existingUserId,
             oauthData.get("provider"),
             oauthData.get("identifier")
         );
-        return Result.success("账号合并成功", loginResponse);
+        return Result.success("账号合并成功", usersService.setUserInfo(existingUser));
     }
 
     /**

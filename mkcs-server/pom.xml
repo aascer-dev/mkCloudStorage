@@ -50,6 +50,12 @@
             <artifactId>sa-token-spring-boot3-starter</artifactId>
         </dependency>
         
+        <!-- Sa-Token JWT 支持 -->
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-jwt</artifactId>
+        </dependency>
+        
         <!-- Druid -->
         <dependency>
             <groupId>com.alibaba</groupId>

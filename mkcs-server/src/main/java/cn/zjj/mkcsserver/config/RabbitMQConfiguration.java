@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * RabbitMQ 配置
+ * @author 34978
  */
 @Configuration
 public class RabbitMQConfiguration {

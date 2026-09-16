@@ -25,6 +25,7 @@ public class StpInterfaceImpl implements StpInterface {
     // 定义在 Session 中存储的 key 常量
     public static final String SESSION_PERMISSION_KEY = "USER_PERMISSIONS";
     public static final String SESSION_ROLE_KEY = "USER_ROLES";
+    public static final String SESSION_USER_KEY = "USER_INFO";
 
     /**
      * 返回一个账号所拥有的权限码集合

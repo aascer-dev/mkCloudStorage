@@ -15,6 +15,8 @@ import org.thymeleaf.context.Context;
 
 /**
  * 邮件服务实现
+ *
+ * @author 34978
  */
 @Slf4j
 @Service
@@ -76,6 +78,7 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public void sendHtmlEmail(String to, String subject, String content) {
+        long start = System.currentTimeMillis();
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -83,10 +86,11 @@ public class EmailServiceImpl implements EmailService {
             helper.setFrom(from, fromName);
             helper.setTo(to);
             helper.setSubject(subject);
-            helper.setText(content, true); // true 表示 HTML 格式
+            // true 表示 HTML 格式
+            helper.setText(content, true);
 
             mailSender.send(message);
-            log.info("HTML 邮件发送成功: to={}, subject={}", to, subject);
+            log.info("HTML 邮件发送成功: to={}, subject={}，耗时{} ms", to, subject, System.currentTimeMillis() - start);
         } catch (Exception e) {
             log.error("HTML 邮件发送失败: to={}, subject={}, error={}", to, subject, e.getMessage(), e);
             throw new RuntimeException("邮件发送失败", e);

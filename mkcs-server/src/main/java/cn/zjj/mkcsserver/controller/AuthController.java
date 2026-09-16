@@ -1,18 +1,13 @@
 package cn.zjj.mkcsserver.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
-import cn.zjj.mkcsmodel.dto.SendVerificationCodeRequest;
-import cn.zjj.mkcsmodel.dto.VerifyCodeRequest;
+import cn.zjj.mkcsmodel.dto.*;
 import cn.zjj.mkcsmodel.entity.Users;
 import cn.zjj.mkcsmodel.vo.AvailabilityResponse;
-import cn.zjj.mkcsserver.converter.UserConverter;
 import cn.zjj.mkcsserver.service.UsersService;
-import cn.zjj.mkcsmodel.dto.LoginRequest;
-import cn.zjj.mkcsmodel.dto.RegisterRequest;
 import cn.zjj.mkcsmodel.vo.LoginResponse;
 import cn.zjj.mkcsserver.service.VerificationCodeService;
 import cn.zjj.mkcsserver.service.OAuth2Service;
-import cn.zjj.mkcsmodel.dto.OAuth2CallbackRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import com.zjj.mkcscommon.Assert;
@@ -25,9 +20,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
-
 import jakarta.validation.Valid;
-
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -85,28 +78,10 @@ public class AuthController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "登出成功")
     })
-    public com.zjj.mkcscommon.result.Result<String> logout() {
+    public Result<String> logout() {
         StpUtil.checkLogin();
         StpUtil.logout();
         return Result.success("登出成功");
-    }
-
-    /**
-     * 获取当前用户信息
-     */
-    @GetMapping("/userinfo")
-    @Operation(summary = "获取用户信息", description = "获取当前登录用户的详细信息")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "获取成功"),
-            @ApiResponse(responseCode = "401", description = "未登录")
-    })
-    public Result<LoginResponse> getUserInfo() {
-        // 检查登录状态
-        StpUtil.checkLogin();
-
-        // 构建用户信息响应
-        Users users = usersService.getBaseMapper().selectById((String) StpUtil.getLoginId());
-        return Result.success("获取用户信息成功", UserConverter.toLoginResponse(users, false));
     }
 
     /**
@@ -123,7 +98,6 @@ public class AuthController {
 
         //判断是否登录
         Assert.isTrue(StpUtil.isLogin(), ResultCode.NOT_LOGIN);
-
         return Result.success("用户已登录", null);
     }
 
@@ -187,8 +161,10 @@ public class AuthController {
         Map<String, Object> data = new HashMap<>();
         data.put("email", request.getEmail());
         data.put("type", request.getType());
-        data.put("cooldown", 60); // 冷却时间（秒）
-        data.put("ttl", 300); // 验证码有效期（秒）
+        // 冷却时间（秒）
+        data.put("cooldown", 60);
+        // 验证码有效期（秒）
+        data.put("ttl", 300);
 
         return Result.success("验证码发送成功，请查收邮件", data);
     }
@@ -423,4 +399,15 @@ public class AuthController {
         Long userId = Long.parseLong((String) StpUtil.getLoginId());
         return oauth2Service.unbindOAuth(userId, provider);
     }
+
+    /**
+     * 忘记密码后进行的修改密码
+     */
+    @PostMapping("/reset-password")
+    public Result<Void> resetPassword(ResetPasswordRequest request){
+        usersService.resetPassword(request);
+        return null;
+    }
+
+
 }

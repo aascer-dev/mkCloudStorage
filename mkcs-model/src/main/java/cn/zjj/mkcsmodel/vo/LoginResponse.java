@@ -77,8 +77,8 @@ public class LoginResponse {
      */
     private List<String> permissions;
     
-    /**
-     * 是否记住我
-     */
-    private Boolean rememberMe;
+    ///**
+    // * 是否记住我
+    // */
+    //private Boolean rememberMe;
 }

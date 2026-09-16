@@ -2,6 +2,7 @@ package cn.zjj.mkcsserver.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.stp.StpUtil;
+import cn.zjj.mkcsmodel.dto.BucketInfoDTO;
 import cn.zjj.mkcsserver.service.StorageBucketsService;
 import cn.zjj.mkcsmodel.entity.StorageBuckets;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -222,6 +223,32 @@ public class StorageBucketsController {
         } else {
             return Result.success("未设置默认存储桶", null);
         }
+    }
+
+    /**
+     * 获取当前用户的存储桶摘要信息（优化端点）
+     * 解决前端登录后并发请求导致的重复查询问题
+     */
+    @GetMapping("/info")
+    @Operation(summary = "获取存储桶摘要信息", description = "一次请求获取用户所有存储桶和默认存储桶，避免并发查询")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "获取成功")
+    })
+    public Result<BucketInfoDTO> getBucketInfo() {
+        Long userId = Long.valueOf(StpUtil.getLoginId().toString());
+        
+        // 一次查询获取所有存储桶
+        List<StorageBuckets> allBuckets = storageBucketsService.getBucketsByUserId(userId);
+        
+        // 从结果中取第一个作为默认桶
+        StorageBuckets defaultBucket = allBuckets.isEmpty() ? null : allBuckets.getFirst();
+        
+        BucketInfoDTO info = new BucketInfoDTO();
+        info.setAllBuckets(allBuckets);
+        info.setDefaultBucket(defaultBucket);
+        info.setTotal(allBuckets.size());
+        
+        return Result.success("获取存储桶信息成功", info);
     }
 
     /**

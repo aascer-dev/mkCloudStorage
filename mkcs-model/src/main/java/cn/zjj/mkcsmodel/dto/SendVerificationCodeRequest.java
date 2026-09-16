@@ -18,8 +18,8 @@ public class SendVerificationCodeRequest {
     private String email;
 
     @NotBlank(message = "验证码类型不能为空")
-    @Schema(description = "验证码类型：REGISTER-注册, RESET_PASSWORD-重置密码, LOGIN-登录验证", 
+    @Schema(description = "验证码类型：REGISTER-注册, RESET_PASSWORD-重置密码, LOGIN-登录验证, CHANGE_EMAIL-修改邮箱", 
             example = "REGISTER", 
-            allowableValues = {"REGISTER", "RESET_PASSWORD", "LOGIN"})
+            allowableValues = {"REGISTER", "RESET_PASSWORD", "LOGIN", "CHANGE_EMAIL", "CHANGE_PASSWORD"})
     private String type;
 }

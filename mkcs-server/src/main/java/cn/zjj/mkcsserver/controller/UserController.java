@@ -1,19 +1,25 @@
 package cn.zjj.mkcsserver.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.zjj.mkcsmodel.entity.Users;
+import cn.zjj.mkcsmodel.vo.LoginResponse;
 import cn.zjj.mkcsserver.service.UsersService;
 import com.zjj.mkcscommon.result.Result;
+import com.zjj.mkcscommon.utils.CommonUtils;
 import com.zjj.mkcscommon.utils.MinIOUtil;
 import com.zjj.mkcscommon.utils.RbacUtil;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -36,21 +42,6 @@ public class UserController {
     // 最大文件大小：5MB
     private static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
 
-
-
-    /**
-     * 获取用户详情
-     */
-    @GetMapping("/{id}")
-    @Operation(summary = "获取用户详情", description = "根据ID获取用户详细信息")
-    public Result<Users> getUserById(@PathVariable Long id) {
-        Users user = usersService.getById(id);
-        if (user != null) {
-            return Result.success("获取成功", user);
-        } else {
-            return Result.error("用户不存在");
-        }
-    }
 
     /**
      * 更新用户头像 - 上传文件到MinIO
@@ -147,7 +138,7 @@ public class UserController {
         if (originalFilename != null && originalFilename.contains(".")) {
             fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
         }
-        String objectName = "user_" + id + "_" + UUID.randomUUID().toString() + fileExtension;
+        String objectName = CommonUtils.generateUUID() + fileExtension;
 
         // 10. 上传文件到MinIO的avatar桶
         String avatarUrl;
@@ -203,5 +194,47 @@ public class UserController {
         log.info("更新用户信息 - 用户ID: {}, 请求: {}", currentUserId, updateRequest);
         
         return usersService.updateUserInfo(currentUserId, updateRequest);
+    }
+
+    /**
+     * 获取当前用户信息
+     */
+    @GetMapping("/info")
+    @SaCheckLogin
+    @Operation(summary = "获取用户信息", description = "获取当前登录用户的详细信息")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "获取成功"),
+            @ApiResponse(responseCode = "401", description = "未登录")
+    })
+    public Result<LoginResponse> getUserInfo() {
+        log.info("获取用户信息");
+        
+        // 从 Redis Session 中获取所有信息（不查询数据库）
+        SaSession session = StpUtil.getSession();
+        
+        // 获取用户信息
+        Users user = (Users) session.get(cn.zjj.mkcsserver.config.satoken.StpInterfaceImpl.SESSION_USER_KEY);
+        if (user == null) {
+            log.warn("Session 中用户信息为空，从数据库读取");
+            user = usersService.getById(StpUtil.getLoginIdAsLong());
+            if (user == null) {
+                return Result.error("用户信息不存在");
+            }
+            // 将用户信息存入 Session
+            session.set(cn.zjj.mkcsserver.config.satoken.StpInterfaceImpl.SESSION_USER_KEY, user);
+        }
+        
+        // 获取角色列表
+        List<String> roles = (List<String>) session.get(cn.zjj.mkcsserver.config.satoken.StpInterfaceImpl.SESSION_ROLE_KEY);
+        
+        // 获取权限列表
+        List<String> permissions = (List<String>) session.get(cn.zjj.mkcsserver.config.satoken.StpInterfaceImpl.SESSION_PERMISSION_KEY);
+        
+        log.info("用户信息获取成功 - 用户ID: {}, 用户名: {}", user.getId(), user.getUsername());
+        
+        // 构建登录响应（完全从 Redis 读取）
+        LoginResponse response = cn.zjj.mkcsserver.converter.UserConverter.toLoginResponse(user, roles, permissions);
+        
+        return Result.success("获取用户信息成功", response);
     }
 }
