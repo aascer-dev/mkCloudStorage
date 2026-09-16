@@ -111,7 +111,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleMethodArgumentNotValidException(MethodArgumentNotValidException e, HttpServletRequest request) {
-        log.warn("参数校验异常: {} - {}", request.getRequestURI(), e.getMessage());
+        log.warn("参数校验失败: uri={}, errorCount={}", request.getRequestURI(), e.getErrorCount());
         
         StringBuilder errorMsg = new StringBuilder();
         for (FieldError fieldError : e.getBindingResult().getFieldErrors()) {
@@ -127,7 +127,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BindException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleBindException(BindException e, HttpServletRequest request) {
-        log.warn("参数绑定异常: {} - {}", request.getRequestURI(), e.getMessage());
+        log.warn("参数绑定校验失败: uri={}, errorCount={}", request.getRequestURI(), e.getErrorCount());
         
         StringBuilder errorMsg = new StringBuilder();
         for (FieldError fieldError : e.getBindingResult().getFieldErrors()) {
@@ -143,7 +143,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleConstraintViolationException(ConstraintViolationException e, HttpServletRequest request) {
-        log.warn("约束违反异常: {} - {}", request.getRequestURI(), e.getMessage());
+        log.warn("请求约束校验失败: uri={}, violationCount={}", request.getRequestURI(), e.getConstraintViolations().size());
         
         StringBuilder errorMsg = new StringBuilder();
         Set<ConstraintViolation<?>> violations = e.getConstraintViolations();

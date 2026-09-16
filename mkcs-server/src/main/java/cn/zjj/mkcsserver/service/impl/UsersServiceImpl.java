@@ -21,6 +21,7 @@ import com.zjj.mkcscommon.Assert;
 import com.zjj.mkcscommon.utils.CommonUtils;
 import com.zjj.mkcscommon.utils.CryptoUtil;
 import com.zjj.mkcscommon.enumeration.ResultCode;
+import com.zjj.mkcscommon.enumeration.VerificationCodeType;
 import com.zjj.mkcscommon.result.Result;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -432,18 +433,23 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
 
     @Override
     public void resetPassword(ResetPasswordRequest request) {
-        //验证存在该用户
+        Assert.isTrue(VerificationCodeType.RESET_PASSWORD.getCode().equals(request.getVerificationCodeType()),
+                ResultCode.PARAM_INVALID, "验证码类型必须为 RESET_PASSWORD");
+
+        // 验证存在该用户
         Users user = getUserByEmail(request.getEmail());
         Assert.notNull(user, ResultCode.USER_NOT_FOUND);
 
-        //验证表单中的验证码
+        // 验证表单中的密码重置验证码，验证成功后由验证码服务一次性消费。
         VerifyCodeRequest verifyCodeRequest = new VerifyCodeRequest(request.getEmail(), request.getCode(), request.getVerificationCodeType());
         Assert.isTrue(verificationCodeService.verifyCode(verifyCodeRequest), ResultCode.VERIFICATION_CODE_INVALID);
 
-        //更新密码
+        // 更新密码并使该用户的已有登录会话失效，避免旧凭据继续使用。
         user.setPassword(cryptoUtil.hashPassword(request.getPassword()));
 
         Assert.isTrue(updateById(user), ResultCode.OPERATION_FAILED, "重置密码失败");
+        StpUtil.kickout(user.getId());
+        log.info("密码重置成功: userId={}", user.getId());
     }
 
 

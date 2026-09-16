@@ -404,9 +404,14 @@ public class AuthController {
      * 忘记密码后进行的修改密码
      */
     @PostMapping("/reset-password")
-    public Result<Void> resetPassword(ResetPasswordRequest request){
+    @Operation(summary = "重置密码", description = "使用 RESET_PASSWORD 邮箱验证码重置密码，并使已有会话失效")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "密码重置成功"),
+            @ApiResponse(responseCode = "400", description = "请求参数不合法")
+    })
+    public Result<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         usersService.resetPassword(request);
-        return null;
+        return Result.success("密码重置成功", null);
     }
 
 

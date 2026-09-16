@@ -29,5 +29,6 @@ public class ResetPasswordRequest {
     private String password;
 
     @NotBlank(message = "验证码类型不能为空")
+    @Pattern(regexp = "^RESET_PASSWORD$", message = "验证码类型必须为 RESET_PASSWORD")
     private String verificationCodeType;
 }
