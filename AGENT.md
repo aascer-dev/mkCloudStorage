@@ -6,7 +6,7 @@
 - Prefer POSIX commands and Git Bash tools such as `rg`, `find`, `sed`, `git`, `docker`, and `./mvnw`. When Git Bash does not provide `rg`, use `grep -R` rather than switching shells just to search text.
 - When the host shell is not Git Bash, invoke commands through Git Bash, for example:
   ```bash
-  "C:/Program Files/Git/bin/bash.exe" -lc 'git status --short'
+  "D:\Scoop\apps\git\current\bin\bash.exe" -lc 'git status --short'
   ```
 - Use PowerShell only for Windows-only tasks that Git Bash cannot perform reliably, such as Windows reserved-port inspection or Windows service configuration. State the reason when doing so.
 
