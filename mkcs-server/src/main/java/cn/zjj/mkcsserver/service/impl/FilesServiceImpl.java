@@ -746,10 +746,18 @@ public class FilesServiceImpl extends ServiceImpl<FilesMapper, Files> implements
     public List<Files> getFolderContents(Long userId, Long folderId, Integer pageNum, Integer pageSize) {
         LambdaQueryWrapper<Files> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Files::getOwnerId, userId)
-                .eq(Files::getParentId, folderId)
                 .eq(Files::getStatus, 1)
                 .orderByDesc(Files::getIsFolder)
                 .orderByDesc(Files::getCreatedAt);
+
+        // The HTTP API reserves 0 for the virtual root directory. Persisted root
+        // records use a NULL parent_id, so applying an equality predicate here
+        // would make a root listing permanently empty.
+        if (folderId == null || folderId == 0L) {
+            wrapper.isNull(Files::getParentId);
+        } else {
+            wrapper.eq(Files::getParentId, folderId);
+        }
 
         int offset = (pageNum - 1) * pageSize;
         return baseMapper.selectList(wrapper.last("LIMIT " + offset + ", " + pageSize));

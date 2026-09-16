@@ -251,7 +251,7 @@ public class FilesController {
      */
     @GetMapping("/folder/{folderId}/contents")
     @SaCheckLogin
-    @Operation(summary = "获取文件夹内容", description = "获取文件夹下的所有文件和子文件夹")
+    @Operation(summary = "获取文件夹内容", description = "获取文件夹下的所有文件和子文件夹；folderId 为 0 表示根目录")
     public Result<List<Files>> getFolderContents(
             @PathVariable Long folderId,
             @RequestParam(value = "pageNum", defaultValue = "1") Integer pageNum,

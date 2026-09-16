@@ -234,6 +234,7 @@ public class UserController {
         
         // 构建登录响应（完全从 Redis 读取）
         LoginResponse response = cn.zjj.mkcsserver.converter.UserConverter.toLoginResponse(user, roles, permissions);
+        response.setAvatarUrl(minIOUtil.normalizeBucketUrl(response.getAvatarUrl(), AVATAR_BUCKET));
         
         return Result.success("获取用户信息成功", response);
     }

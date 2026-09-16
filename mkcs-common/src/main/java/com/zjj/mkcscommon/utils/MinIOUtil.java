@@ -81,6 +81,45 @@ public class MinIOUtil {
     }
 
     /**
+     * 将同一 MinIO 主机上指定存储桶的历史访问地址改为当前 endpoint。
+     *
+     * <p>对象 URL 曾被完整持久化，修改 MinIO 端口不会自动更新旧记录。该方法只处理
+     * 同主机且路径属于指定桶的 URL，避免改写第三方头像地址。</p>
+     *
+     * @param objectUrl 已持久化的对象访问地址
+     * @param bucketName 对象所在的存储桶
+     * @return 使用当前 endpoint 的对象地址；不符合条件时返回原地址
+     */
+    public String normalizeBucketUrl(String objectUrl, String bucketName) {
+        if (objectUrl == null || objectUrl.isBlank() || bucketName == null || bucketName.isBlank()) {
+            return objectUrl;
+        }
+
+        try {
+            URI objectUri = URI.create(objectUrl);
+            URI endpointUri = URI.create(endpoint);
+            String bucketPathPrefix = "/" + bucketName + "/";
+            if (objectUri.getHost() == null
+                    || endpointUri.getHost() == null
+                    || !objectUri.getHost().equalsIgnoreCase(endpointUri.getHost())
+                    || objectUri.getRawPath() == null
+                    || !objectUri.getRawPath().startsWith(bucketPathPrefix)) {
+                return objectUrl;
+            }
+
+            String normalizedEndpoint = endpoint.endsWith("/")
+                    ? endpoint.substring(0, endpoint.length() - 1)
+                    : endpoint;
+            String query = objectUri.getRawQuery();
+            return query == null
+                    ? normalizedEndpoint + objectUri.getRawPath()
+                    : normalizedEndpoint + objectUri.getRawPath() + "?" + query;
+        } catch (IllegalArgumentException exception) {
+            return objectUrl;
+        }
+    }
+
+    /**
      * 上传文件到 MinIO 服务器
      *
      * @param file       要上传的文件
