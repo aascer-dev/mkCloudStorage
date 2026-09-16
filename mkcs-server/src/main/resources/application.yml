@@ -121,7 +121,8 @@ sa-token:
     is-share: true             # 多人登录同账号是否共用一个 token
     token-style: jwt           # Token 生成策略
     jwt-secret-key: ${MKCS_JWT_SECRET_KEY}  # JWT 签名密钥（至少32字符）
-    is-log: true                # 是否输出操作日志
+    is-log: false               # 禁止框架输出可能包含敏感配置的日志
+    is-print: false             # 禁止启动时打印完整 Sa-Token 配置
     is-read-cookie: true        # 是否从 Cookie 读取 token
     is-read-header: true        # 是否从 Header 读取 token
     token-prefix: Bearer        # Token 前缀
@@ -141,6 +142,8 @@ mybatis-plus:
       logic-not-delete-value: 0
 
 mkcs:
+  cors:
+    allowed-origins: ${MKCS_CORS_ALLOWED_ORIGINS:http://localhost:5173}
   minio:
     access-key: ${mkcs.minio.access-key}
     secret-key: ${mkcs.minio.secret-key}

@@ -29,6 +29,9 @@ CREATE TABLE `file_contents`  (
   `mime_type` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT 'MIME 类型',
   `status` tinyint NOT NULL DEFAULT 1 COMMENT '状态：0=已删除/失效, 1=正常可用',
   `reference_count` int UNSIGNED NOT NULL DEFAULT 1 COMMENT '被引用的文件元数据记录数，用于安全删除判断',
+  `random_offset` bigint UNSIGNED NULL DEFAULT NULL COMMENT '秒传随机位置校验的起始字节位置',
+  `random_length` int UNSIGNED NULL DEFAULT NULL COMMENT '秒传随机位置校验的字节长度',
+  `random_position_hash` char(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '秒传随机位置数据块的MD5 hash',
   `created_at` datetime NULL DEFAULT NULL COMMENT '创建时间',
   `updated_at` datetime NULL DEFAULT NULL COMMENT '更新时间',
   `created_by` bigint NULL DEFAULT NULL COMMENT '创建人ID',
@@ -197,6 +200,10 @@ CREATE TABLE `roles`  (
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_name`(`name` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 5 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '角色定义表' ROW_FORMAT = Dynamic;
+
+-- 最小 RBAC 种子。注册流程按角色名读取 ROLE_USER，不依赖固定主键值。
+INSERT INTO `roles` (`name`, `description`) VALUES
+('ROLE_USER', '普通用户');
 
 -- ----------------------------
 -- Table structure for shares

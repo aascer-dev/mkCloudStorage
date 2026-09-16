@@ -3,12 +3,14 @@ package cn.zjj.mkcsserver.service.impl;
 import cn.dev33.satoken.session.SaSession;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.zjj.mkcsmodel.dto.*;
+import cn.zjj.mkcsmodel.entity.Roles;
 import cn.zjj.mkcsmodel.entity.StorageBuckets;
 import cn.zjj.mkcsmodel.entity.UserRoles;
 import cn.zjj.mkcsmodel.entity.Users;
 import cn.zjj.mkcsmodel.vo.LoginResponse;
 import cn.zjj.mkcsserver.config.satoken.StpInterfaceImpl;
 import cn.zjj.mkcsserver.converter.UserConverter;
+import cn.zjj.mkcsserver.mapper.RolesMapper;
 import cn.zjj.mkcsserver.mapper.UsersMapper;
 import cn.zjj.mkcsserver.service.StorageBucketsService;
 import cn.zjj.mkcsserver.service.UserRolesService;
@@ -45,10 +47,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements UsersService {
 
+    private static final String DEFAULT_USER_ROLE = "ROLE_USER";
+
     private final CryptoUtil cryptoUtil;
     private final StorageBucketsService storageBucketsService;
     private final UserRolesService userRolesService;
     private final VerificationCodeService verificationCodeService;
+    private final RolesMapper rolesMapper;
 
     /**
      * 登录方法，支持用户名或邮箱登录，并根据记住我设置不同的超时时间
@@ -242,10 +247,12 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         saved = save(user);
         Assert.isTrue(saved, "用户创建失败");
 
+        Roles defaultRole = rolesMapper.selectByName(DEFAULT_USER_ROLE);
+        Assert.notNull(defaultRole, "默认用户角色不存在，请先执行 sql 目录中的角色初始化脚本");
+
         UserRoles userRoles = new UserRoles();
         userRoles.setUserId(user.getId());
-        // 普通用户角色ID
-        userRoles.setRoleId(2L);
+        userRoles.setRoleId(defaultRole.getId());
         boolean savedRole = userRolesService.insertUserRoleRelation(userRoles);
         Assert.isTrue(savedRole, "用户角色分配失败");
 

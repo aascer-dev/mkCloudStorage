@@ -23,17 +23,21 @@
 ## 下一步优先级
 
 1. [x] 密码重置端点已返回统一成功响应，限制 `RESET_PASSWORD` 验证码类型，重置后使已有会话失效，并覆盖参数校验、验证码失败和成功路径测试。
-2. 复核分片初始化 DTO：`ChunkUploadRequest` 同时要求 `uploadId`、分片索引、分片哈希和分片大小，但初始化接口并不使用这些字段；拆分初始化与分片上传请求模型，避免客户端提交无关必填字段。
-3. 完成秒传随机位置校验的端到端测试：执行数据库迁移，验证首次上传记录校验信息、相同文件秒传、篡改文件不能秒传。现有 `test_random_position_checksum.sh` 和 `.bat` 可作为人工验证起点。
-4. 根据根目录 `sql/` 的脚本和目标数据库结构，补足从空库启动所需的建表与版本化迁移策略，并验证 RBAC 与文件去重字段。
-5. 完善 Sa-Token 全局异常和 CORS 配置，清理 `SaTokenExceptionHandler` 中的待办，并覆盖未登录、无权限和预检请求。
-6. 为认证、权限、上传、去重、分片与迁移增加可重复的自动化测试，然后运行完整 Maven 测试套件。
+2. [x] 分片初始化与分片上传请求已拆分为 `ChunkUploadInitRequest` 和 `ChunkPartUploadRequest`；初始化不再要求上传任务或分片字段，单分片 multipart 元数据使用专用 DTO 并完成接口测试。
+3. [x] 秒传随机位置校验端到端验证已完成：新增 `sql/V20260916_001__add_file_content_random_checksum.sql`，从空库和已有本地库重复执行迁移；`FileUploadRandomChecksumIntegrationTest` 已验证首次上传写入校验信息、相同文件秒传并增加引用计数、篡改文件不能秒传。
+4. [x] 已完善根目录 `sql/` 的空库与增量迁移策略：`mkCloudStorage.sql` 作为可重建基线，`V20260916_002__seed_default_user_role.sql` 为已有库补齐 `ROLE_USER`；注册改为按角色名查询，不再依赖固定角色 ID。已在临时空库导入基线、重复执行补丁，并验证 RBAC 外键、`ROLE_USER` 与文件去重/随机校验字段。
+5. [x] Sa-Token 全局异常与 CORS 已完善：认证过滤器仅保护非认证 `/api/**` 路径，未登录返回 HTTP 401 标准响应，权限/角色不足返回 HTTP 403 且不暴露内部标识；CORS 仅允许配置的 Origin 并放行预检。已移除待办和标准输出日志，关闭 Sa-Token 的配置/框架日志打印。
+6. [x] 已为认证、权限、上传、去重、分片与迁移补充可重复自动化测试：认证与 CORS 覆盖未登录、预检和权限错误映射；RBAC 测试改为隔离的 Mapper 单元测试；上传覆盖随机校验去重集成、分片任务缺失/越权/重复/缺片、取消清理和越权下载。迁移已按根目录 SQL 的空库与已有库路径验证，并完成完整 Maven 测试套件。
 
 ## 验证状态
 
-- `mvn -pl mkcs-server -am test -DskipTests` 已通过：主代码与测试源码均可编译，测试执行因参数显式跳过。
+- `mvn -B -pl mkcs-server -am -Dtest=FilesControllerChunkRequestTest -Dsurefire.failIfNoSpecifiedTests=false test` 已通过：3 个分片请求 DTO/接口绑定测试成功。
+- `mvn -B -pl mkcs-server -am -Dtest=FileUploadRandomChecksumIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test` 已通过：1 个 MySQL 与 MinIO 集成测试成功；迁移已在空库和本地已有库重复执行验证。
+- `mvn -B test` 已通过：Reactor 共 29 个测试，0 个失败、0 个错误；其中秒传集成测试使用本地 MySQL 与 MinIO，并在结束后清理测试数据和对象。
+- 空库与已有库迁移验证已通过：临时空库导入 `sql/mkCloudStorage.sql` 后有 14 张表、4 个去重/随机校验字段、`uk_content_hash`、`ROLE_USER` 和 4 条 RBAC 外键；`V20260916_002__seed_default_user_role.sql` 已在本地开发库重复执行验证。
+- `mvn -B -pl mkcs-server -am -Dtest=SecurityWebIntegrationTest,GlobalExceptionHandlerSecurityTest -Dsurefire.failIfNoSpecifiedTests=false test` 已通过：4 个测试覆盖未登录 401、允许/拒绝 Origin 的预检和不泄露权限标识的 403 响应；启动日志未出现完整 Sa-Token 配置字段。
 - Maven Wrapper 已补回必需的 `.mvn/wrapper/maven-wrapper.properties`；仍需在可联网或已有 Maven 分发包的环境中验证其首次下载行为。
-- 本次未启动 MySQL、Redis、MinIO、RabbitMQ 或邮件服务，核心流程仍需在完整本地依赖环境中执行集成测试。
+- Redis、RabbitMQ 与邮件发送链路尚未纳入本轮自动化集成测试；其连接与行为仍需在对应功能变更时单独验证。
 - `application.yml` 和 `application-dev.yml` 的敏感配置已改为环境变量引用；之前暴露过的本地凭据和密钥必须轮换。
 - 根目录 `sql/` 是当前唯一数据库脚本来源。该目录包含运行数据导出，导入前需核验目标环境并妥善保管其中的敏感字段。
 - 根目录的 `test_random_position_checksum.sh`、`test_random_position_checksum.bat` 和 `verify_jwt_token.sh` 是功能校验辅助脚本，不作为冗余文件删除。

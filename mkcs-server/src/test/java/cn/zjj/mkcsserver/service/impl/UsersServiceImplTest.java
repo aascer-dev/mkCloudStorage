@@ -3,7 +3,11 @@ package cn.zjj.mkcsserver.service.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.zjj.mkcsmodel.dto.ResetPasswordRequest;
 import cn.zjj.mkcsmodel.dto.VerifyCodeRequest;
+import cn.zjj.mkcsmodel.entity.Roles;
+import cn.zjj.mkcsmodel.entity.StorageBuckets;
+import cn.zjj.mkcsmodel.entity.UserRoles;
 import cn.zjj.mkcsmodel.entity.Users;
+import cn.zjj.mkcsserver.mapper.RolesMapper;
 import cn.zjj.mkcsserver.service.StorageBucketsService;
 import cn.zjj.mkcsserver.service.UserRolesService;
 import cn.zjj.mkcsserver.service.VerificationCodeService;
@@ -43,13 +47,16 @@ class UsersServiceImplTest {
     @Mock
     private VerificationCodeService verificationCodeService;
 
+    @Mock
+    private RolesMapper rolesMapper;
+
     @Test
     void resetPasswordUpdatesHashConsumesResetCodeAndKicksOutSessions() {
         Users user = new Users();
         user.setId(1001L);
         ResetPasswordRequest request = resetRequest();
         UsersServiceImpl usersService = spy(new UsersServiceImpl(
-                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService));
+                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper));
         doReturn(user).when(usersService).getUserByEmail(request.getEmail());
         doReturn(true).when(usersService).updateById(user);
         when(verificationCodeService.verifyCode(any(VerifyCodeRequest.class))).thenReturn(true);
@@ -74,7 +81,7 @@ class UsersServiceImplTest {
         Users user = new Users();
         ResetPasswordRequest request = resetRequest();
         UsersServiceImpl usersService = spy(new UsersServiceImpl(
-                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService));
+                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper));
         doReturn(user).when(usersService).getUserByEmail(request.getEmail());
         when(verificationCodeService.verifyCode(any(VerifyCodeRequest.class))).thenReturn(false);
 
@@ -92,7 +99,7 @@ class UsersServiceImplTest {
         ResetPasswordRequest request = resetRequest();
         request.setVerificationCodeType("REGISTER");
         UsersServiceImpl usersService = new UsersServiceImpl(
-                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService);
+                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper);
 
         assertThatThrownBy(() -> usersService.resetPassword(request))
                 .isInstanceOf(BusinessException.class)
@@ -100,6 +107,60 @@ class UsersServiceImplTest {
                 .isEqualTo(ResultCode.PARAM_INVALID.getCode());
 
         verifyNoInteractions(verificationCodeService, cryptoUtil);
+    }
+
+    @Test
+    void createUserAssignsTheRoleResolvedByName() {
+        Users user = newUser();
+        Roles defaultRole = new Roles();
+        defaultRole.setId(9876L);
+        defaultRole.setName("ROLE_USER");
+        StorageBuckets bucket = new StorageBuckets();
+        bucket.setId(2002L);
+
+        UsersServiceImpl usersService = spy(new UsersServiceImpl(
+                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper));
+        doReturn(true).when(usersService).isUsernameAvailable(user.getUsername(), null);
+        doReturn(true).when(usersService).isEmailAvailable(user.getEmail(), null);
+        doReturn(true).when(usersService).save(user);
+        doReturn(true).when(usersService).updateById(user);
+        when(cryptoUtil.hashPassword(user.getPassword())).thenReturn("hashed-password");
+        when(rolesMapper.selectByName("ROLE_USER")).thenReturn(defaultRole);
+        when(userRolesService.insertUserRoleRelation(any(UserRoles.class))).thenReturn(true);
+        when(storageBucketsService.createBucket(any(), any(), any())).thenReturn(bucket);
+
+        usersService.createUser(user);
+
+        verify(userRolesService).insertUserRoleRelation(argThat(userRole ->
+                user.getId().equals(userRole.getUserId())
+                        && defaultRole.getId().equals(userRole.getRoleId())));
+        assertThat(user.getCurrentBucketId()).isEqualTo(bucket.getId());
+    }
+
+    @Test
+    void createUserFailsBeforeCreatingBucketWhenDefaultRoleIsMissing() {
+        Users user = newUser();
+        UsersServiceImpl usersService = spy(new UsersServiceImpl(
+                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper));
+        doReturn(true).when(usersService).isUsernameAvailable(user.getUsername(), null);
+        doReturn(true).when(usersService).isEmailAvailable(user.getEmail(), null);
+        doReturn(true).when(usersService).save(user);
+        when(cryptoUtil.hashPassword(user.getPassword())).thenReturn("hashed-password");
+
+        assertThatThrownBy(() -> usersService.createUser(user))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("默认用户角色不存在");
+
+        verifyNoInteractions(userRolesService, storageBucketsService);
+    }
+
+    private Users newUser() {
+        Users user = new Users();
+        user.setId(1001L);
+        user.setUsername("new-user");
+        user.setEmail("new-user@example.com");
+        user.setPassword("plain-password");
+        return user;
     }
 
     private ResetPasswordRequest resetRequest() {

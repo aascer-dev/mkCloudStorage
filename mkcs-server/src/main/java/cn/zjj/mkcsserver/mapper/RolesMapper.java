@@ -1,6 +1,7 @@
 package cn.zjj.mkcsserver.mapper;
 
 import cn.zjj.mkcsmodel.entity.Roles;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 
@@ -15,4 +16,9 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface RolesMapper extends BaseMapper<Roles> {
 
+    default Roles selectByName(String name) {
+        return selectOne(new LambdaQueryWrapper<Roles>()
+                .eq(Roles::getName, name)
+                .last("LIMIT 1"));
+    }
 }

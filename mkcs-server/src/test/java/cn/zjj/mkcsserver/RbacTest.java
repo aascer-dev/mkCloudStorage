@@ -1,128 +1,101 @@
 package cn.zjj.mkcsserver;
 
+import cn.zjj.mkcsmodel.entity.Users;
 import cn.zjj.mkcsmodel.vo.UserRolePermissionVO;
-import cn.zjj.mkcsserver.service.UserRolesService;
+import cn.zjj.mkcsserver.mapper.UserRolesMapper;
+import cn.zjj.mkcsserver.mapper.UsersMapper;
+import cn.zjj.mkcsserver.service.impl.UserRolesServiceImpl;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
-/**
- * RBAC权限管理测试类
- * 
- * @author zjj
- */
-@SpringBootTest(classes = MkcsServerApplication.class)
-@ActiveProfiles("dev")
-public class RbacTest {
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
-    @Autowired
-    private UserRolesService userRolesService;
+@ExtendWith(MockitoExtension.class)
+class RbacTest {
 
-    @Test
-    public void testGetUserRolePermissions() {
-        // 测试查询用户角色权限信息
-        Long userId = 2016438988250046465L;
-        
-        UserRolePermissionVO result = userRolesService.getUserRolePermissions(userId);
-        
-        if (result != null) {
-            System.out.println("用户ID: " + result.getUserId());
-            System.out.println("用户名: " + result.getUsername());
-            System.out.println("昵称: " + result.getNickname());
-            
-            System.out.println("角色列表:");
-            if (result.getRoles() != null) {
-                for (UserRolePermissionVO.RoleVO role : result.getRoles()) {
-                    System.out.println("  - " + role.getRoleName() + ": " + role.getRoleDescription());
-                    if (role.getPermissions() != null) {
-                        for (UserRolePermissionVO.PermissionVO permission : role.getPermissions()) {
-                            System.out.println("    * " + permission.getPermissionName() + ": " + permission.getPermissionDescription());
-                        }
-                    }
-                }
-            }
-            
-            System.out.println("所有权限:");
-            if (result.getPermissions() != null) {
-                for (UserRolePermissionVO.PermissionVO permission : result.getPermissions()) {
-                    System.out.println("  - " + permission.getPermissionName() + ": " + permission.getPermissionDescription());
-                }
-            }
-        } else {
-            System.out.println("用户不存在或没有角色权限");
-        }
+    @Mock
+    private UsersMapper usersMapper;
+
+    @Mock
+    private UserRolesMapper userRolesMapper;
+
+    private UserRolesServiceImpl userRolesService;
+
+    @BeforeEach
+    void setUp() {
+        userRolesService = new UserRolesServiceImpl(usersMapper);
+        ReflectionTestUtils.setField(userRolesService, "baseMapper", userRolesMapper);
     }
 
     @Test
-    public void testGetUserRoleNames() {
-        // 测试查询用户角色名称
-        Long userId = 2016438988250046465L;
-        
-        List<String> roles = userRolesService.getUserRoleNames(userId);
-        
-        System.out.println("用户 " + userId + " 的角色:");
-        for (String role : roles) {
-            System.out.println("  - " + role);
-        }
+    void returnsNullWithoutQueryingWhenUserIdIsMissing() {
+        assertThat(userRolesService.getUserRolePermissions(null)).isNull();
+
+        verifyNoInteractions(usersMapper, userRolesMapper);
     }
 
     @Test
-    public void testGetUserPermissionNames() {
-        // 测试查询用户权限名称
-        Long userId = 2016438988250046465L;
-        
-        List<String> permissions = userRolesService.getUserPermissionNames(userId);
-        
-        System.out.println("用户 " + userId + " 的权限:");
-        for (String permission : permissions) {
-            System.out.println("  - " + permission);
-        }
+    void assemblesRolesAndDistinctPermissionsForExistingUser() {
+        Users user = new Users();
+        user.setUsername("rbac-user");
+        user.setNickname("RBAC User");
+        UserRolePermissionVO.RoleVO role = new UserRolePermissionVO.RoleVO();
+        role.setRoleId(20L);
+        role.setRoleName("ROLE_USER");
+        UserRolePermissionVO.PermissionVO permission = new UserRolePermissionVO.PermissionVO();
+        permission.setPermissionId(30L);
+        permission.setPermissionName("file:read");
+
+        when(usersMapper.selectById(10L)).thenReturn(user);
+        when(userRolesMapper.selectUserRoles(10L)).thenReturn(List.of(role));
+        when(userRolesMapper.selectRolePermissions(20L)).thenReturn(List.of(permission));
+        when(userRolesMapper.selectUserPermissions(10L)).thenReturn(List.of(permission));
+
+        UserRolePermissionVO result = userRolesService.getUserRolePermissions(10L);
+
+        assertThat(result.getUserId()).isEqualTo(10L);
+        assertThat(result.getUsername()).isEqualTo("rbac-user");
+        assertThat(result.getRoles()).singleElement().satisfies(actualRole ->
+                assertThat(actualRole.getPermissions()).extracting(UserRolePermissionVO.PermissionVO::getPermissionName)
+                        .containsExactly("file:read"));
+        assertThat(result.getPermissions()).extracting(UserRolePermissionVO.PermissionVO::getPermissionName)
+                .containsExactly("file:read");
     }
 
     @Test
-    public void testHasRole() {
-        // 测试检查用户是否拥有指定角色
-        Long userId = 2016438988250046465L;
-        String roleName = "ROLE_ADMIN";
-        
-        boolean hasRole = userRolesService.hasRole(userId, roleName);
-        
-        System.out.println("用户 " + userId + " 是否拥有角色 " + roleName + ": " + hasRole);
+    void rejectsInvalidAuthorizationArgumentsBeforeQuerying() {
+        assertThat(userRolesService.hasRole(null, "ROLE_USER")).isFalse();
+        assertThat(userRolesService.hasRole(10L, " ")).isFalse();
+        assertThat(userRolesService.hasPermission(null, "file:read")).isFalse();
+        assertThat(userRolesService.hasAllPermissions(10L, List.of())).isFalse();
+        assertThat(userRolesService.hasAnyPermission(10L, List.of())).isFalse();
+
+        verifyNoInteractions(userRolesMapper);
     }
 
     @Test
-    public void testHasPermission() {
-        // 测试检查用户是否拥有指定权限
-        Long userId = 2016438988250046465L;
-        String permissionName = "sys:user:create";
-        
-        boolean hasPermission = userRolesService.hasPermission(userId, permissionName);
-        
-        System.out.println("用户 " + userId + " 是否拥有权限 " + permissionName + ": " + hasPermission);
-    }
+    void evaluatesRoleAndPermissionSetsUsingMapperResults() {
+        when(userRolesMapper.countUserRole(10L, "ROLE_USER")).thenReturn(1);
+        when(userRolesMapper.countUserPermission(10L, "file:read")).thenReturn(0);
+        when(userRolesMapper.selectUserPermissionNames(10L)).thenReturn(List.of("file:read", "file:write"));
 
-    @Test
-    public void testHasAllPermissions() {
-        // 测试检查用户是否拥有所有指定权限
-        Long userId = 2016438988250046465L;
-        List<String> permissions = List.of("sys:user:create", "sys:user:update", "sys:user:delete");
-        
-        boolean hasAllPermissions = userRolesService.hasAllPermissions(userId, permissions);
-        
-        System.out.println("用户 " + userId + " 是否拥有所有权限 " + permissions + ": " + hasAllPermissions);
-    }
+        assertThat(userRolesService.hasRole(10L, "ROLE_USER")).isTrue();
+        assertThat(userRolesService.hasPermission(10L, "file:read")).isFalse();
+        assertThat(userRolesService.hasAllPermissions(10L, List.of("file:read", "file:write"))).isTrue();
+        assertThat(userRolesService.hasAllPermissions(10L, List.of("file:read", "admin:manage"))).isFalse();
+        assertThat(userRolesService.hasAnyPermission(10L, List.of("admin:manage", "file:write"))).isTrue();
+        assertThat(userRolesService.hasAnyPermission(10L, List.of("admin:manage"))).isFalse();
 
-    @Test
-    public void testHasAnyPermission() {
-        // 测试检查用户是否拥有任意指定权限
-        Long userId = 2016438988250046465L;
-        List<String> permissions = List.of("sys:user:create", "file:upload", "storage:manage");
-        
-        boolean hasAnyPermission = userRolesService.hasAnyPermission(userId, permissions);
-        
-        System.out.println("用户 " + userId + " 是否拥有任意权限 " + permissions + ": " + hasAnyPermission);
+        verify(userRolesMapper).countUserRole(10L, "ROLE_USER");
+        verify(userRolesMapper).countUserPermission(10L, "file:read");
     }
 }

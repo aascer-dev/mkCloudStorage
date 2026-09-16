@@ -75,14 +75,12 @@ minio:
 ### 数据库初始化
 
 ```sql
--- 数据库脚本以项目根目录 sql/ 为准
--- 根据目标环境已有表结构，按需导入对应表的数据脚本
-SOURCE sql/roles.sql;
-SOURCE sql/permissions.sql;
-SOURCE sql/role_permissions.sql;
+CREATE DATABASE mkCloudStorage CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE mkCloudStorage;
+SOURCE sql/mkCloudStorage.sql;
 ```
 
-`sql/` 是数据库脚本的唯一执行来源。项目当前未引入自动迁移工具，执行前需确认目标库的表结构与脚本匹配；不再使用 `mkcs-server/src/main/resources/db/migration/`。
+`sql/` 是数据库脚本的唯一执行来源。`mkCloudStorage.sql` 会重建表，只能用于新库或明确允许重建的环境；已有库必须备份后按版本顺序执行尚未应用的 `VYYYYMMDD_NNN__*.sql`。项目当前未引入自动迁移工具，应用启动不会执行 SQL；详细执行顺序、验证与回滚边界见 [`sql/README.md`](sql/README.md)。
 
 ### 编译与运行
 

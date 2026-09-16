@@ -36,31 +36,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NotLoginException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public Result<Void> handleNotLoginException(NotLoginException e, HttpServletRequest request) {
-        log.warn("未登录异常: {} - {}", request.getRequestURI(), e.getMessage());
-        
-        String message;
-        switch (e.getType()) {
-            case NotLoginException.NOT_TOKEN:
-                message = "未提供Token";
-                break;
-            case NotLoginException.INVALID_TOKEN:
-                message = "Token无效";
-                break;
-            case NotLoginException.TOKEN_TIMEOUT:
-                message = "Token已过期";
-                break;
-            case NotLoginException.BE_REPLACED:
-                message = "Token已被顶下线";
-                break;
-            case NotLoginException.KICK_OUT:
-                message = "Token已被踢下线";
-                break;
-            default:
-                message = "当前会话未登录";
-                break;
-        }
-        
-        return Result.error(ResultCode.UNAUTHORIZED.getCode(), message);
+        log.warn("未登录请求: uri={}, type={}", request.getRequestURI(), e.getType());
+        return Result.error(ResultCode.UNAUTHORIZED);
     }
     
     /**
@@ -69,9 +46,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NotPermissionException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public Result<Void> handleNotPermissionException(NotPermissionException e, HttpServletRequest request) {
-        log.warn("权限不足异常: {} - {}", request.getRequestURI(), e.getMessage());
-        String message = String.format("权限不足，需要权限: %s", e.getPermission());
-        return Result.error(ResultCode.PERMISSION_DENIED.getCode(), message);
+        log.warn("权限拒绝: uri={}", request.getRequestURI());
+        return Result.error(ResultCode.PERMISSION_DENIED);
     }
     
     /**
@@ -80,9 +56,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NotRoleException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public Result<Void> handleNotRoleException(NotRoleException e, HttpServletRequest request) {
-        log.warn("角色不足异常: {} - {}", request.getRequestURI(), e.getMessage());
-        String message = String.format("角色不足，需要角色: %s", e.getRole());
-        return Result.error(ResultCode.PERMISSION_DENIED.getCode(), message);
+        log.warn("角色访问被拒绝: uri={}", request.getRequestURI());
+        return Result.error(ResultCode.PERMISSION_DENIED);
     }
     
     /**
@@ -91,8 +66,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(SaTokenException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public Result<Void> handleSaTokenException(SaTokenException e, HttpServletRequest request) {
-        log.warn("Sa-Token异常: {} - {}", request.getRequestURI(), e.getMessage());
-        return Result.error(ResultCode.UNAUTHORIZED.getCode(), e.getMessage());
+        log.warn("Sa-Token请求失败: uri={}, exceptionType={}", request.getRequestURI(), e.getClass().getSimpleName());
+        return Result.error(ResultCode.UNAUTHORIZED);
     }
     
     /**

@@ -2,7 +2,8 @@ package cn.zjj.mkcsserver.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.stp.StpUtil;
-import cn.zjj.mkcsmodel.dto.ChunkUploadRequest;
+import cn.zjj.mkcsmodel.dto.ChunkPartUploadRequest;
+import cn.zjj.mkcsmodel.dto.ChunkUploadInitRequest;
 import cn.zjj.mkcsmodel.dto.FileUploadRequest;
 import cn.zjj.mkcsmodel.dto.FolderUploadRequest;
 import cn.zjj.mkcsmodel.entity.Files;
@@ -100,7 +101,7 @@ public class FilesController {
     @PostMapping("/chunk/init")
     @SaCheckLogin
     @Operation(summary = "初始化分片上传", description = "初始化分片上传任务")
-    public Result<ChunkUploadResponse> initChunkUpload(@Valid @RequestBody ChunkUploadRequest request) {
+    public Result<ChunkUploadResponse> initChunkUpload(@Valid @RequestBody ChunkUploadInitRequest request) {
         log.info("初始化分片上传: {}, 分片数: {}", request.getFilename(), request.getTotalChunks());
         Long userId = StpUtil.getLoginIdAsLong();
         
@@ -122,23 +123,18 @@ public class FilesController {
      */
     @PostMapping("/chunk/upload")
     @SaCheckLogin
-    @Operation(summary = "上传分片", description = "上传单个分片，支持断点续传")
+    @Operation(summary = "上传分片", description = "上传单个分片，支持断点续传；分片元数据和二进制内容使用 multipart/form-data 传输")
     public Result<ChunkUploadResponse> uploadChunk(
-            @RequestParam("uploadId") String uploadId,
-            @RequestParam("chunkIndex") Integer chunkIndex,
-            @RequestParam("chunk") MultipartFile chunk,
-            @RequestParam(value = "chunkHash", required = false) String chunkHash,
-            @RequestParam(value = "randomOffset", required = false) Long randomOffset,
-            @RequestParam(value = "randomLength", required = false) Integer randomLength,
-            @RequestParam(value = "randomHash", required = false) String randomHash) {
+            @Valid @ModelAttribute ChunkPartUploadRequest request,
+            @RequestParam("chunk") MultipartFile chunk) {
         
-        log.info("上传分片: uploadId={}, index={}", uploadId, chunkIndex);
+        log.info("上传分片: uploadId={}, index={}", request.getUploadId(), request.getChunkIndex());
         Long userId = StpUtil.getLoginIdAsLong();
         
         try {
             ChunkUploadResponse response = filesService.uploadChunk(
-                    userId, uploadId, chunkIndex, chunk, chunkHash,
-                    randomOffset, randomLength, randomHash);
+                    userId, request.getUploadId(), request.getChunkIndex(), chunk, request.getChunkHash(),
+                    request.getRandomOffset(), request.getRandomLength(), request.getRandomHash());
             return Result.success(response.getIsComplete() ? "文件上传完成" : "分片上传成功", response);
         } catch (Exception e) {
             log.error("分片上传失败", e);
