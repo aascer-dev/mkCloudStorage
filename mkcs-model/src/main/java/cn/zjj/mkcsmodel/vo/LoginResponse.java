@@ -19,7 +19,12 @@ public class LoginResponse {
     /**
      * 访问令牌
      */
-    private String token;
+    private String accessToken;
+
+    /**
+     * Refresh token used only with the refresh and logout endpoints.
+     */
+    private String refreshToken;
     
     /**
      * 令牌类型

@@ -72,7 +72,8 @@ public enum ResultCode {
     BUCKET_UPDATE_FAILED(4005, "存储桶更新失败"),
     INVALID_BUCKET_NAME(4006, "存储桶名称格式不正确"),
     DEFAULT_BUCKET_CANNOT_DELETE(4007, "默认存储桶不能删除"),
-    ACCESS_DENIED(4008, "访问被拒绝");
+    ACCESS_DENIED(4008, "访问被拒绝"),
+    STORAGE_QUOTA_EXCEEDED(4009, "存储空间不足");
     
     /**
      * 状态码

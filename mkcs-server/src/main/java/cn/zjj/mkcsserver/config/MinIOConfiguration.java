@@ -19,9 +19,11 @@ public class MinIOConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public MinIOUtil minioUtil(MinIOProperties minIOProperties) {
-        log.info("开始创建MinIOUtil对象，配置参数：{}", minIOProperties);
+        log.info("开始创建 MinIOUtil 对象: endpoint={}, publicEndpoint={}, bucketName={}",
+                minIOProperties.getEndpoint(), minIOProperties.getPublicEndpoint(), minIOProperties.getBucketName());
         return new MinIOUtil(
                 minIOProperties.getEndpoint(),
+                minIOProperties.getPublicEndpoint(),
                 minIOProperties.getAccessKey(),
                 minIOProperties.getSecretKey(),
                 minIOProperties.getBucketName()

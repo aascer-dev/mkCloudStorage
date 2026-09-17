@@ -117,6 +117,17 @@ public class UploadTasks extends BaseEntity {
     @TableField("temp_path")
     private String tempPath;
 
+    /** S3/MinIO Multipart upload ID; never exposed as an API resource identifier. */
+    @TableField("minio_upload_id")
+    private String minioUploadId;
+
+    /** Server-generated target object key. */
+    @TableField("object_key")
+    private String objectKey;
+
+    @TableField("mime_type")
+    private String mimeType;
+
     /**
      * 完成后关联的 files.id（成功后填写）
      */

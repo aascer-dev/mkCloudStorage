@@ -1,15 +1,13 @@
 package cn.zjj.mkcsserver.controller;
 
-import cn.dev33.satoken.annotation.SaCheckLogin;
-import cn.dev33.satoken.session.SaSession;
-import cn.dev33.satoken.stp.StpUtil;
 import cn.zjj.mkcsmodel.entity.Users;
 import cn.zjj.mkcsmodel.vo.LoginResponse;
+import cn.zjj.mkcsserver.auth.AuthorizationService;
+import cn.zjj.mkcsserver.auth.UserContext;
 import cn.zjj.mkcsserver.service.UsersService;
 import com.zjj.mkcscommon.result.Result;
 import com.zjj.mkcscommon.utils.CommonUtils;
 import com.zjj.mkcscommon.utils.MinIOUtil;
-import com.zjj.mkcscommon.utils.RbacUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -19,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,6 +33,7 @@ public class UserController {
 
     private final UsersService usersService;
     private final MinIOUtil minIOUtil;
+    private final AuthorizationService authorizationService;
 
     // avatar 桶名称常量
     private static final String AVATAR_BUCKET = "avatar";
@@ -47,17 +47,16 @@ public class UserController {
      * 更新用户头像 - 上传文件到MinIO
      */
     @PostMapping("/{id}/avatar")
-    @SaCheckLogin
     @Operation(summary = "更新用户头像", description = "上传头像文件到MinIO的avatar桶，需要 user:updateAvatar 权限")
     public Result<Users> updateAvatar(
             @PathVariable Long id,
             @RequestParam("file") MultipartFile file) {
 
-        log.info("更新用户头像 - 用户ID: {}, 文件名: {}, 文件大小: {} bytes",
-                id, file.getOriginalFilename(), file.getSize());
+        log.info("更新用户头像 - 用户ID: {}, 文件大小: {} bytes, 内容类型: {}",
+                id, file.getSize(), file.getContentType());
 
         // 1. 获取当前登录用户ID
-        Long currentUserId = StpUtil.getLoginIdAsLong();
+        Long currentUserId = UserContext.requireUserId();
 
         // 2. 检查是否是本人
         boolean isSelf = currentUserId.equals(id);
@@ -65,7 +64,7 @@ public class UserController {
         // 3. 权限检查
         if (isSelf) {
             // 更新自己的头像：需要 user:updateAvatar 权限
-            boolean hasPermission = RbacUtil.hasPermission("user:updateAvatar");
+            boolean hasPermission = authorizationService.hasPermission("user:updateAvatar");
             log.info("用户 {} 更新自己的头像 - hasPermission: {}", currentUserId, hasPermission);
             
             if (!hasPermission) {
@@ -74,8 +73,8 @@ public class UserController {
             }
         } else {
             // 更新他人的头像：需要管理员权限
-            boolean isAdmin = RbacUtil.isAdmin();
-            boolean isSuperAdmin = RbacUtil.isSuperAdmin();
+            boolean isAdmin = authorizationService.hasRole("ROLE_ADMIN");
+            boolean isSuperAdmin = authorizationService.hasRole("ROLE_SUPER_ADMIN");
             log.info("用户 {} 尝试更新用户 {} 的头像 - isAdmin: {}, isSuperAdmin: {}", 
                     currentUserId, id, isAdmin, isSuperAdmin);
             
@@ -144,38 +143,71 @@ public class UserController {
         String avatarUrl;
         try {
             avatarUrl = minIOUtil.upload(file, AVATAR_BUCKET, objectName);
-            log.info("头像上传成功 - 用户ID: {}, 对象名: {}, URL: {}", id, objectName, avatarUrl);
+            log.info("头像上传成功 - 用户ID: {}", id);
         } catch (Exception e) {
             log.error("上传头像到MinIO失败: {}", e.getMessage(), e);
             return Result.error("头像上传失败");
         }
 
-        // 11. 删除旧头像（可选）
-        if (user.getAvatarUrl() != null && !user.getAvatarUrl().isEmpty()) {
-            try {
-                // 从URL中提取对象名称
-                String oldAvatarUrl = user.getAvatarUrl();
-                if (oldAvatarUrl.contains(AVATAR_BUCKET + "/")) {
-                    String oldObjectName = oldAvatarUrl.substring(
-                            oldAvatarUrl.indexOf(AVATAR_BUCKET + "/") + AVATAR_BUCKET.length() + 1);
-                    minIOUtil.deleteObject(AVATAR_BUCKET, oldObjectName);
-                    log.info("旧头像已删除: {}", oldObjectName);
-                }
-            } catch (Exception e) {
-                log.warn("删除旧头像失败（不影响新头像上传）: {}", e.getMessage());
-            }
+        String oldAvatarObjectName = extractAvatarObjectName(user.getAvatarUrl());
+        user.setAvatarUrl(avatarUrl);
+        boolean success;
+        try {
+            success = usersService.updateById(user);
+        } catch (RuntimeException exception) {
+            cleanupUploadedAvatar(id, objectName);
+            log.error("头像 URL 持久化异常，已尝试清理新对象: userId={}", id, exception);
+            return Result.error("头像更新失败");
         }
 
-        // 12. 更新用户头像URL
-        user.setAvatarUrl(avatarUrl);
-        boolean success = usersService.updateById(user);
+        if (!success) {
+            cleanupUploadedAvatar(id, objectName);
+            log.warn("头像 URL 持久化失败，已尝试清理新对象: userId={}", id);
+            return Result.error("头像更新失败");
+        } else {
+            if (oldAvatarObjectName != null) {
+                boolean oldAvatarDeleted = minIOUtil.deleteObject(AVATAR_BUCKET, oldAvatarObjectName);
+                if (!oldAvatarDeleted) {
+                    log.warn("头像 URL 已更新，但旧对象删除失败: userId={}", id);
+                }
+            }
 
-        if (success) {
             Users updatedUser = usersService.getById(id);
             log.info("用户头像更新成功 - 用户ID: {}", id);
             return Result.success("头像更新成功", updatedUser);
-        } else {
-            return Result.error("头像更新失败");
+        }
+    }
+
+    private void cleanupUploadedAvatar(Long userId, String objectName) {
+        try {
+            if (!minIOUtil.deleteObject(AVATAR_BUCKET, objectName)) {
+                log.warn("新头像对象补偿清理失败: userId={}", userId);
+            }
+        } catch (RuntimeException exception) {
+            log.error("新头像对象补偿清理异常: userId={}", userId, exception);
+        }
+    }
+
+    private String extractAvatarObjectName(String avatarUrl) {
+        if (avatarUrl == null || avatarUrl.isBlank()) {
+            return null;
+        }
+
+        try {
+            URI avatarUri = URI.create(avatarUrl);
+            URI endpointUri = URI.create(minIOUtil.getEndpoint());
+            String bucketPathPrefix = "/" + AVATAR_BUCKET + "/";
+            if (avatarUri.getHost() == null
+                    || endpointUri.getHost() == null
+                    || !avatarUri.getHost().equalsIgnoreCase(endpointUri.getHost())
+                    || avatarUri.getRawPath() == null
+                    || !avatarUri.getRawPath().startsWith(bucketPathPrefix)) {
+                return null;
+            }
+            return avatarUri.getRawPath().substring(bucketPathPrefix.length());
+        } catch (IllegalArgumentException exception) {
+            log.warn("无法解析已存储的头像地址，跳过旧对象删除: userId={}", UserContext.get());
+            return null;
         }
     }
 
@@ -183,13 +215,12 @@ public class UserController {
      * 更新当前用户信息
      */
     @PutMapping("/profile")
-    @SaCheckLogin
     @Operation(summary = "更新当前用户信息", description = "更新当前登录用户的个人信息（昵称、邮箱等）")
     public Result<cn.zjj.mkcsmodel.vo.LoginResponse> updateProfile(
             @RequestBody @jakarta.validation.Valid cn.zjj.mkcsmodel.dto.UpdateUserRequest updateRequest) {
         
         // 获取当前登录用户ID
-        Long currentUserId = cn.dev33.satoken.stp.StpUtil.getLoginIdAsLong();
+        Long currentUserId = UserContext.requireUserId();
         
         log.info("更新用户信息 - 用户ID: {}, 请求: {}", currentUserId, updateRequest);
         
@@ -200,7 +231,6 @@ public class UserController {
      * 获取当前用户信息
      */
     @GetMapping("/info")
-    @SaCheckLogin
     @Operation(summary = "获取用户信息", description = "获取当前登录用户的详细信息")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "获取成功"),
@@ -209,31 +239,14 @@ public class UserController {
     public Result<LoginResponse> getUserInfo() {
         log.info("获取用户信息");
         
-        // 从 Redis Session 中获取所有信息（不查询数据库）
-        SaSession session = StpUtil.getSession();
-        
-        // 获取用户信息
-        Users user = (Users) session.get(cn.zjj.mkcsserver.config.satoken.StpInterfaceImpl.SESSION_USER_KEY);
+        Users user = usersService.getById(UserContext.requireUserId());
         if (user == null) {
-            log.warn("Session 中用户信息为空，从数据库读取");
-            user = usersService.getById(StpUtil.getLoginIdAsLong());
-            if (user == null) {
-                return Result.error("用户信息不存在");
-            }
-            // 将用户信息存入 Session
-            session.set(cn.zjj.mkcsserver.config.satoken.StpInterfaceImpl.SESSION_USER_KEY, user);
+            return Result.error("用户信息不存在");
         }
-        
-        // 获取角色列表
-        List<String> roles = (List<String>) session.get(cn.zjj.mkcsserver.config.satoken.StpInterfaceImpl.SESSION_ROLE_KEY);
-        
-        // 获取权限列表
-        List<String> permissions = (List<String>) session.get(cn.zjj.mkcsserver.config.satoken.StpInterfaceImpl.SESSION_PERMISSION_KEY);
         
         log.info("用户信息获取成功 - 用户ID: {}, 用户名: {}", user.getId(), user.getUsername());
         
-        // 构建登录响应（完全从 Redis 读取）
-        LoginResponse response = cn.zjj.mkcsserver.converter.UserConverter.toLoginResponse(user, roles, permissions);
+        LoginResponse response = usersService.setUserInfo(user);
         response.setAvatarUrl(minIOUtil.normalizeBucketUrl(response.getAvatarUrl(), AVATAR_BUCKET));
         
         return Result.success("获取用户信息成功", response);

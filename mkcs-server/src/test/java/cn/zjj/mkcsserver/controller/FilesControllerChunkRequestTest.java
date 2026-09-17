@@ -1,7 +1,9 @@
 package cn.zjj.mkcsserver.controller;
 
-import cn.dev33.satoken.stp.StpUtil;
+import cn.zjj.mkcsserver.auth.AuthenticatedUser;
+import cn.zjj.mkcsserver.auth.UserContext;
 import cn.zjj.mkcsmodel.vo.ChunkUploadResponse;
+import cn.zjj.mkcsmodel.vo.FilePreviewUrlResponse;
 import cn.zjj.mkcsserver.service.FilesService;
 import cn.zjj.mkcsserver.handler.GlobalExceptionHandler;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,7 +11,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
@@ -52,9 +53,8 @@ class FilesControllerChunkRequestTest {
                 eq("file-hash"), eq(2), eq(7L), eq(9L), eq("application/zip")))
                 .thenReturn(ChunkUploadResponse.builder().uploadId("upload-1").build());
 
-        try (MockedStatic<StpUtil> stpUtil = org.mockito.Mockito.mockStatic(StpUtil.class)) {
-            stpUtil.when(StpUtil::getLoginIdAsLong).thenReturn(42L);
-
+        UserContext.set(new AuthenticatedUser(42L, "user", 1L));
+        try {
             mockMvc.perform(MockMvcRequestBuilders.post("/api/files/chunk/init")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
@@ -71,10 +71,29 @@ class FilesControllerChunkRequestTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.uploadId").value("upload-1"));
-        }
+        } finally { UserContext.clear(); }
 
         verify(filesService).initChunkUpload(42L, "archive.zip", 1024L,
                 "file-hash", 2, 7L, 9L, "application/zip");
+    }
+
+    @Test
+    void previewUrlRequiresTheAuthenticatedOwnerAndReturnsOnlyTheShortLivedUrl() throws Exception {
+        when(filesService.createPreviewUrl(42L, 7L)).thenReturn(FilePreviewUrlResponse.builder()
+                .previewUrl("/api/files/preview/7?ticket=opaque-ticket")
+                .expiresInSeconds(300)
+                .build());
+
+        UserContext.set(new AuthenticatedUser(42L, "user", 1L));
+        try {
+            mockMvc.perform(MockMvcRequestBuilders.post("/api/files/7/preview-url"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200))
+                    .andExpect(jsonPath("$.data.previewUrl").value("/api/files/preview/7?ticket=opaque-ticket"))
+                    .andExpect(jsonPath("$.data.expiresInSeconds").value(300));
+        } finally { UserContext.clear(); }
+
+        verify(filesService).createPreviewUrl(42L, 7L);
     }
 
     @Test
@@ -84,9 +103,8 @@ class FilesControllerChunkRequestTest {
                 eq(0L), eq(3), eq("random-hash")))
                 .thenReturn(ChunkUploadResponse.builder().isComplete(false).build());
 
-        try (MockedStatic<StpUtil> stpUtil = org.mockito.Mockito.mockStatic(StpUtil.class)) {
-            stpUtil.when(StpUtil::getLoginIdAsLong).thenReturn(42L);
-
+        UserContext.set(new AuthenticatedUser(42L, "user", 1L));
+        try {
             mockMvc.perform(MockMvcRequestBuilders.multipart("/api/files/chunk/upload")
                             .file(chunk)
                             .param("uploadId", "upload-1")
@@ -97,7 +115,7 @@ class FilesControllerChunkRequestTest {
                             .param("randomHash", "random-hash"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
-        }
+        } finally { UserContext.clear(); }
 
         verify(filesService).uploadChunk(42L, "upload-1", 0, chunk, "chunk-hash", 0L, 3, "random-hash");
     }

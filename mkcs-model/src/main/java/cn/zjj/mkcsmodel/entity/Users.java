@@ -72,4 +72,10 @@ public class Users extends BaseEntity {
      */
     @TableField("status")
     private Byte status;
+
+    /**
+     * Authentication version. Incrementing it invalidates all previously issued tokens.
+     */
+    @TableField("token_version")
+    private Long tokenVersion;
 }

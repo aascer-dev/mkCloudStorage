@@ -1,28 +1,21 @@
-# MKCS 数据库脚本
+# MKCS 数据库迁移
 
-本目录是唯一的数据库脚本来源。应用没有集成 Flyway 或 Liquibase，也不会在启动时自动执行 SQL；执行权限和执行记录由部署人员负责。
+应用使用 Flyway 自动执行 `mkcs-server/src/main/resources/db/migration/` 中的版本化 SQL。每次启动都会先校验迁移历史，再执行尚未应用的迁移；执行记录保存于 `flyway_schema_history`。
 
 ## 新建空库
 
-`mkCloudStorage.sql` 是可重建的基线脚本，含 `DROP TABLE`，只能用于新建、明确允许重建的数据库。创建数据库后执行它即可获得当前完整结构、随机位置校验字段和 `ROLE_USER` 最小 RBAC 种子。
+只需创建数据库并启动应用。Flyway 会依次执行 `V1__initial_schema.sql` 和后续迁移，不需要手动 `SOURCE` SQL 文件。
 
 ```sql
 CREATE DATABASE mkCloudStorage CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE mkCloudStorage;
-SOURCE sql/mkCloudStorage.sql;
 ```
-
-不要在已承载数据的环境执行基线脚本，也不要对新库重复执行已被基线吸收的历史补丁。
 
 ## 已有数据库
 
-先备份，再按文件名升序执行尚未执行的 `VYYYYMMDD_NNN__*.sql`。当前补丁顺序如下：
+首次接入的非空数据库会自动记录 V1 基线，并执行其后的增量迁移。迁移脚本必须保持不可变；不要手工插入、修改或删除 `flyway_schema_history` 记录。
 
-1. `V20260916_001__add_file_content_random_checksum.sql`：补齐秒传随机位置校验字段；可重复执行。
-2. `V20260916_002__seed_default_user_role.sql`：补齐注册需要的 `ROLE_USER`；可重复执行。
+`mkCloudStorage.sql` 是当前 schema 快照，只用于人工检查和受控恢复。它包含 `DROP TABLE`，绝不能作为常规部署或升级入口。
 
-每次执行后记录环境、脚本名、执行时间、操作者和 `SHOW CREATE TABLE`/关键查询结果。结构升级后至少确认：`file_contents.content_hash` 唯一、`reference_count` 与三个随机校验字段存在，且 `roles` 中存在 `ROLE_USER`。
+## 新增迁移
 
-## 回滚与边界
-
-补丁 `001` 的新增列均为可空列；只有回退所有读取这些列的应用实例后才可移除。补丁 `002` 不应删除仍被 `user_roles` 引用的角色。任何破坏性迁移必须新增版本化脚本，先进行兼容发布和数据回填，不能修改已在环境执行过的版本文件。
+在 `mkcs-server/src/main/resources/db/migration/` 新建 `V<version>__<description>.sql`，例如 `V20260918_001__add_share_expiry_index.sql`。一次结构变更使用一个新文件；已在任何环境执行过的迁移不得修改。破坏性改动必须先兼容发布、回填和验证，再在后续迁移中清理旧结构。

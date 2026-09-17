@@ -1,14 +1,13 @@
 package cn.zjj.mkcsserver.service.impl;
 
-import cn.dev33.satoken.session.SaSession;
-import cn.dev33.satoken.stp.StpUtil;
 import cn.zjj.mkcsmodel.dto.*;
 import cn.zjj.mkcsmodel.entity.Roles;
 import cn.zjj.mkcsmodel.entity.StorageBuckets;
 import cn.zjj.mkcsmodel.entity.UserRoles;
 import cn.zjj.mkcsmodel.entity.Users;
 import cn.zjj.mkcsmodel.vo.LoginResponse;
-import cn.zjj.mkcsserver.config.satoken.StpInterfaceImpl;
+import cn.zjj.mkcsserver.auth.TokenPair;
+import cn.zjj.mkcsserver.auth.TokenService;
 import cn.zjj.mkcsserver.converter.UserConverter;
 import cn.zjj.mkcsserver.mapper.RolesMapper;
 import cn.zjj.mkcsserver.mapper.UsersMapper;
@@ -17,6 +16,7 @@ import cn.zjj.mkcsserver.service.UserRolesService;
 import cn.zjj.mkcsserver.service.UsersService;
 import cn.zjj.mkcsserver.service.VerificationCodeService;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zjj.mkcscommon.Assert;
@@ -31,7 +31,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -54,6 +53,7 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
     private final UserRolesService userRolesService;
     private final VerificationCodeService verificationCodeService;
     private final RolesMapper rolesMapper;
+    private final TokenService tokenService;
 
     /**
      * 登录方法，支持用户名或邮箱登录，并根据记住我设置不同的超时时间
@@ -74,26 +74,8 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         Assert.isTrue(user.getStatus() == 1, ResultCode.USER_DISABLED);
         Assert.isTrue(cryptoUtil.verifyPassword(loginRequest.getPassword(), user.getPassword()), ResultCode.PASSWORD_ERROR);
 
-        // 2. 执行登录（生成 Token）
-        // 14天或6小时
-        StpUtil.login(user.getId(), loginRequest.getRememberMe() ? 1209600 : 21600);
-
-        // 3. 【关键优化】主动加载权限并存入 Session，防止 Converter 调用时 Session 尚未就绪导致击穿
-        List<String> roles = userRolesService.getUserRoleNames(user.getId());
-        List<String> permissions = userRolesService.getUserPermissionNames(user.getId());
-
-        // 获取当前会话的 Session
-        SaSession session = StpUtil.getSession();
-        session.set(StpInterfaceImpl.SESSION_ROLE_KEY, roles);
-        session.set(StpInterfaceImpl.SESSION_PERMISSION_KEY, permissions);
-        
-        // 【新增】将用户信息也存储到 Session 中
-        session.set(StpInterfaceImpl.SESSION_USER_KEY, user);
-
-        // 4. 将查好的数据传给 Converter，不再在 Converter 内部调用工具类
-
         log.info("用户登录成功: userId={}", user.getId());
-        return Result.success("登录成功", setUserInfo(user));
+        return Result.success("登录成功", issueLoginResponse(user));
     }
 
     /**
@@ -119,22 +101,11 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         user.setEmail(registerRequest.getEmail());
         user.setNickname(registerRequest.getNickname());
         user.setStatus((byte) 1);
+        user.setTokenVersion(1L);
 
         createUser(user);
 
-        // 4) 自动登录并返回登录响应
-        boolean rememberMe = Boolean.TRUE.equals(registerRequest.getRememberMe());
-        StpUtil.login(user.getId(), rememberMe ? 14 * 24 * 60 * 60 : 6 * 60 * 60);
-
-        // 主动加载用户角色和权限到Session
-        SaSession session = StpUtil.getSession();
-        List<String> roles = userRolesService.getUserRoleNames(user.getId());
-        List<String> permissions = userRolesService.getUserPermissionNames(user.getId());
-        session.set(StpInterfaceImpl.SESSION_ROLE_KEY, roles != null ? roles : new ArrayList<>());
-        session.set(StpInterfaceImpl.SESSION_PERMISSION_KEY, permissions != null ? permissions : new ArrayList<>());
-        session.set(StpInterfaceImpl.SESSION_USER_KEY, user);  // 存储用户信息
-
-        return Result.success("注册成功", setUserInfo(user));
+        return Result.success("注册成功", issueLoginResponse(user));
     }
 
     // ==================== 用户查询方法 ====================
@@ -319,7 +290,13 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         Assert.notNull(status, "状态不能为空");
         Assert.isTrue(status == 0 || status == 1, "状态值必须为0或1");
 
-        int updated = baseMapper.updateStatusByIds(userIds, status);
+        LambdaUpdateWrapper<Users> updateWrapper = new LambdaUpdateWrapper<Users>()
+                .in(Users::getId, userIds)
+                .set(Users::getStatus, status);
+        if (status == 0) {
+            updateWrapper.setSql("token_version = COALESCE(token_version, 1) + 1");
+        }
+        int updated = baseMapper.update(null, updateWrapper);
         log.info("批量更新用户状态: userIds={}, status={}, updated={}", userIds, status, updated);
         return updated > 0;
     }
@@ -405,31 +382,7 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         boolean success = updateById(user);
         Assert.isTrue(success, ResultCode.OPERATION_FAILED, "更新用户信息失败");
 
-        // 7. 【关键】更新 Redis 中的 Session
-        try {
-            SaSession session = StpUtil.getSession();
-            if (session != null) {
-                // 重新加载权限和角色
-                List<String> roles = userRolesService.getUserRoleNames(userId);
-                List<String> permissions = userRolesService.getUserPermissionNames(userId);
-                
-                // 更新 Session 中的用户对象（包含最新的昵称、邮箱等）
-                session.set(StpInterfaceImpl.SESSION_USER_KEY, user);
-                
-                // 更新 Session 中的权限和角色
-                session.set(StpInterfaceImpl.SESSION_ROLE_KEY, roles);
-                session.set(StpInterfaceImpl.SESSION_PERMISSION_KEY, permissions);
-                
-                // 【关键】更新 Session 到 Redis
-                // 方式：直接修改 Session 对象，Sa-Token 会自动同步到 Redis
-                // Session 对象是引用类型，修改后会自动保存
-                log.info("Session 已更新: userId={}", userId);
-            }
-        } catch (Exception e) {
-            log.warn("更新 Session 失败，但不影响业务逻辑: {}", e.getMessage());
-        }
-
-        // 8. 返回更新后的用户信息
+        // 7. 返回更新后的用户信息
         Users updatedUser = user;
 
         log.info("用户信息更新成功: userId={}, nickname={}, email={}",
@@ -451,28 +404,30 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         VerifyCodeRequest verifyCodeRequest = new VerifyCodeRequest(request.getEmail(), request.getCode(), request.getVerificationCodeType());
         Assert.isTrue(verificationCodeService.verifyCode(verifyCodeRequest), ResultCode.VERIFICATION_CODE_INVALID);
 
-        // 更新密码并使该用户的已有登录会话失效，避免旧凭据继续使用。
+        // 更新密码并提升认证版本，使已有令牌在下次验证时失效。
         user.setPassword(cryptoUtil.hashPassword(request.getPassword()));
+        user.setTokenVersion((user.getTokenVersion() == null ? 1L : user.getTokenVersion()) + 1);
 
         Assert.isTrue(updateById(user), ResultCode.OPERATION_FAILED, "重置密码失败");
-        StpUtil.kickout(user.getId());
         log.info("密码重置成功: userId={}", user.getId());
     }
 
 
     @Override
     public LoginResponse setUserInfo(Users user) {
-        // 获取当前会话 Session
-        SaSession session = StpUtil.getSession();
+        return UserConverter.toLoginResponse(user,
+                userRolesService.getUserRoleNames(user.getId()),
+                userRolesService.getUserPermissionNames(user.getId()),
+                null);
+    }
 
-        // 取出角色列表
-        List<String> roles = (List<String>) session.get(StpInterfaceImpl.SESSION_ROLE_KEY);
-
-        // 取出权限列表
-        List<String> permissions = (List<String>) session.get(StpInterfaceImpl.SESSION_PERMISSION_KEY);
-
-
-        return UserConverter.toLoginResponse(user, roles, permissions);
+    @Override
+    public LoginResponse issueLoginResponse(Users user) {
+        TokenPair tokenPair = tokenService.issueTokens(user);
+        return UserConverter.toLoginResponse(user,
+                userRolesService.getUserRoleNames(user.getId()),
+                userRolesService.getUserPermissionNames(user.getId()),
+                tokenPair);
     }
 }
 

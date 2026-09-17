@@ -57,11 +57,6 @@
             <artifactId>spring-data-redis</artifactId>
         </dependency>
 
-        <!-- Sa-Token -->
-        <dependency>
-            <groupId>cn.dev33</groupId>
-            <artifactId>sa-token-spring-boot3-starter</artifactId>
-        </dependency>
     </dependencies>
 
     <build>

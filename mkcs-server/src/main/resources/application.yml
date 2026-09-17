@@ -69,6 +69,14 @@ spring:
       fail-fast: true
       break-after-acquire-failure: true
       connection-error-retry-attempts: 0
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # Existing installations receive a V1 baseline; empty databases execute V1.
+    baseline-on-migrate: true
+    baseline-version: 1
+    validate-on-migrate: true
+    clean-disabled: true
   data:
     redis:
       host: ${mkcs.redis.host}
@@ -114,21 +122,6 @@ spring:
           timeout: 5000
           writetimeout: 5000
 
-############## Sa-Token 配置 (文档: https://sa-token.cc) ##############
-sa-token:
-    token-name: mkcs            # Token 名称/同名 Cookie
-    timeout: 7200               # Token 有效期（秒），-1 永久
-    active-timeout: -1          # 最低活跃频率（秒），-1 不冻结
-    is-concurrent: true         # 允许多地同时登录
-    is-share: true             # 多人登录同账号是否共用一个 token
-    token-style: jwt           # Token 生成策略
-    jwt-secret-key: ${MKCS_JWT_SECRET_KEY}  # JWT 签名密钥（至少32字符）
-    is-log: false               # 禁止框架输出可能包含敏感配置的日志
-    is-print: false             # 禁止启动时打印完整 Sa-Token 配置
-    is-read-cookie: true        # 是否从 Cookie 读取 token
-    is-read-header: true        # 是否从 Header 读取 token
-    token-prefix: Bearer        # Token 前缀
-
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
   type-aliases-package: cn.zjj.mkcsmodel.entity
@@ -144,12 +137,18 @@ mybatis-plus:
       logic-not-delete-value: 0
 
 mkcs:
+  auth:
+    issuer: mkcs
+    access-token-ttl: 30m
+    refresh-token-ttl: 14d
+    secret-key: ${MKCS_JWT_SECRET_KEY}
   cors:
     allowed-origins: ${MKCS_CORS_ALLOWED_ORIGINS:http://localhost:5173}
   minio:
     access-key: ${mkcs.minio.access-key}
     secret-key: ${mkcs.minio.secret-key}
     endpoint: ${mkcs.minio.endpoint}
+    public-endpoint: ${MKCS_MINIO_PUBLIC_ENDPOINT:${mkcs.minio.endpoint}}
     bucket-name: ${mkcs.minio.bucket-name}
   crypto:
     default-salt: mkcs-cloud-storage-salt           # 默认盐值

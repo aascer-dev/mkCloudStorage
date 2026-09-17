@@ -162,4 +162,6 @@ public interface UsersService extends IService<Users> {
     void resetPassword(ResetPasswordRequest request);
 
     LoginResponse setUserInfo(Users user);
+
+    LoginResponse issueLoginResponse(Users user);
 }

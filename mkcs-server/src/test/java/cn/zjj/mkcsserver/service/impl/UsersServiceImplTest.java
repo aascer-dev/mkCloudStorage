@@ -1,6 +1,6 @@
 package cn.zjj.mkcsserver.service.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
+import cn.zjj.mkcsserver.auth.TokenService;
 import cn.zjj.mkcsmodel.dto.ResetPasswordRequest;
 import cn.zjj.mkcsmodel.dto.VerifyCodeRequest;
 import cn.zjj.mkcsmodel.entity.Roles;
@@ -17,7 +17,6 @@ import com.zjj.mkcscommon.utils.CryptoUtil;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,7 +24,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -50,25 +48,26 @@ class UsersServiceImplTest {
     @Mock
     private RolesMapper rolesMapper;
 
+    @Mock
+    private TokenService tokenService;
+
     @Test
-    void resetPasswordUpdatesHashConsumesResetCodeAndKicksOutSessions() {
+    void resetPasswordUpdatesHashConsumesResetCodeAndInvalidatesExistingTokens() {
         Users user = new Users();
         user.setId(1001L);
+        user.setTokenVersion(1L);
         ResetPasswordRequest request = resetRequest();
         UsersServiceImpl usersService = spy(new UsersServiceImpl(
-                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper));
+                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper, tokenService));
         doReturn(user).when(usersService).getUserByEmail(request.getEmail());
         doReturn(true).when(usersService).updateById(user);
         when(verificationCodeService.verifyCode(any(VerifyCodeRequest.class))).thenReturn(true);
         when(cryptoUtil.hashPassword(request.getPassword())).thenReturn("hashed-password");
 
-        try (MockedStatic<StpUtil> stpUtil = mockStatic(StpUtil.class)) {
-            usersService.resetPassword(request);
-
-            stpUtil.verify(() -> StpUtil.kickout(user.getId()));
-        }
+        usersService.resetPassword(request);
 
         assertThat(user.getPassword()).isEqualTo("hashed-password");
+        assertThat(user.getTokenVersion()).isEqualTo(2L);
         verify(verificationCodeService).verifyCode(argThat(codeRequest ->
                 request.getEmail().equals(codeRequest.getEmail())
                         && request.getCode().equals(codeRequest.getCode())
@@ -81,7 +80,7 @@ class UsersServiceImplTest {
         Users user = new Users();
         ResetPasswordRequest request = resetRequest();
         UsersServiceImpl usersService = spy(new UsersServiceImpl(
-                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper));
+                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper, tokenService));
         doReturn(user).when(usersService).getUserByEmail(request.getEmail());
         when(verificationCodeService.verifyCode(any(VerifyCodeRequest.class))).thenReturn(false);
 
@@ -99,7 +98,7 @@ class UsersServiceImplTest {
         ResetPasswordRequest request = resetRequest();
         request.setVerificationCodeType("REGISTER");
         UsersServiceImpl usersService = new UsersServiceImpl(
-                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper);
+                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper, tokenService);
 
         assertThatThrownBy(() -> usersService.resetPassword(request))
                 .isInstanceOf(BusinessException.class)
@@ -119,7 +118,7 @@ class UsersServiceImplTest {
         bucket.setId(2002L);
 
         UsersServiceImpl usersService = spy(new UsersServiceImpl(
-                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper));
+                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper, tokenService));
         doReturn(true).when(usersService).isUsernameAvailable(user.getUsername(), null);
         doReturn(true).when(usersService).isEmailAvailable(user.getEmail(), null);
         doReturn(true).when(usersService).save(user);
@@ -141,7 +140,7 @@ class UsersServiceImplTest {
     void createUserFailsBeforeCreatingBucketWhenDefaultRoleIsMissing() {
         Users user = newUser();
         UsersServiceImpl usersService = spy(new UsersServiceImpl(
-                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper));
+                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper, tokenService));
         doReturn(true).when(usersService).isUsernameAvailable(user.getUsername(), null);
         doReturn(true).when(usersService).isEmailAvailable(user.getEmail(), null);
         doReturn(true).when(usersService).save(user);

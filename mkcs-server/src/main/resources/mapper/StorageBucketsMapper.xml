@@ -2,4 +2,22 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="cn.zjj.mkcsserver.mapper.StorageBucketsMapper">
 
+    <update id="reserveStorage">
+        UPDATE storage_buckets
+        SET used_storage = used_storage + #{size}
+        WHERE id = #{bucketId}
+          AND owner_id = #{ownerId}
+          AND status = 1
+          AND #{size} &lt;= total_storage
+          AND used_storage &lt;= total_storage - #{size}
+    </update>
+
+    <update id="releaseStorage">
+        UPDATE storage_buckets
+        SET used_storage = CASE
+            WHEN used_storage &gt; #{size} THEN used_storage - #{size}
+            ELSE 0
+        END
+        WHERE id = #{bucketId}
+    </update>
 </mapper>

@@ -1,6 +1,6 @@
 package cn.zjj.mkcsserver.handler;
 
-import cn.dev33.satoken.exception.NotPermissionException;
+import cn.zjj.mkcsserver.auth.AccessDeniedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -43,7 +43,7 @@ class GlobalExceptionHandlerSecurityTest {
         @GetMapping("/test/permission-denied")
         @ResponseBody
         void rejectRequest() {
-            throw new NotPermissionException("internal:write");
+            throw new AccessDeniedException();
         }
     }
 }

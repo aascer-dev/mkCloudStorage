@@ -1,8 +1,7 @@
 package cn.zjj.mkcsserver.controller;
 
-import cn.dev33.satoken.annotation.SaCheckLogin;
-import cn.dev33.satoken.stp.StpUtil;
 import cn.zjj.mkcsmodel.dto.BucketInfoDTO;
+import cn.zjj.mkcsserver.auth.UserContext;
 import cn.zjj.mkcsserver.service.StorageBucketsService;
 import cn.zjj.mkcsmodel.entity.StorageBuckets;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -32,7 +31,6 @@ import java.util.List;
 @RequestMapping("/api/storage-buckets")
 @Tag(name = "存储桶管理", description = "存储桶相关接口")
 @RequiredArgsConstructor
-@SaCheckLogin
 public class StorageBucketsController {
 
     private final StorageBucketsService storageBucketsService;
@@ -50,7 +48,7 @@ public class StorageBucketsController {
     public Result<StorageBuckets> createBucket(
             @Valid @RequestBody CreateBucketRequest request) {
         
-        Long userId = Long.valueOf(StpUtil.getLoginId().toString());
+        Long userId = UserContext.requireUserId();
         StorageBuckets bucket = storageBucketsService.createBucket(
                 request.getBucketName(), 
                 request.getDescription(), 
@@ -73,7 +71,7 @@ public class StorageBucketsController {
     public Result<String> deleteBucket(
             @Parameter(description = "存储桶ID") @PathVariable @NotNull @Positive Long bucketId) {
         
-        Long userId = Long.valueOf(StpUtil.getLoginId().toString());
+        Long userId = UserContext.requireUserId();
         boolean deleted = storageBucketsService.deleteBucket(bucketId, userId);
         
         if (deleted) {
@@ -92,7 +90,7 @@ public class StorageBucketsController {
         @ApiResponse(responseCode = "200", description = "获取成功")
     })
     public Result<List<StorageBuckets>> getMyBuckets() {
-        Long userId = Long.valueOf(StpUtil.getLoginId().toString());
+        Long userId = UserContext.requireUserId();
         List<StorageBuckets> buckets = storageBucketsService.getBucketsByUserId(userId);
         return Result.success("获取存储桶列表成功", buckets);
     }
@@ -115,7 +113,7 @@ public class StorageBucketsController {
             @Parameter(description = "结束时间") @RequestParam(required = false) 
             @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
         
-        Long userId = Long.valueOf(StpUtil.getLoginId().toString());
+        Long userId = UserContext.requireUserId();
         IPage<StorageBuckets> page = storageBucketsService.getBucketPage(
                 pageNum, pageSize, userId, bucketName, status, startTime, endTime);
         
@@ -140,7 +138,7 @@ public class StorageBucketsController {
         }
         
         // 检查权限
-        Long userId = Long.valueOf(StpUtil.getLoginId().toString());
+        Long userId = UserContext.requireUserId();
         if (!bucket.getOwnerId().equals(userId)) {
             return Result.error("无权限访问该存储桶");
         }
@@ -169,7 +167,7 @@ public class StorageBucketsController {
         }
         
         // 检查权限
-        Long userId = Long.valueOf(StpUtil.getLoginId().toString());
+        Long userId = UserContext.requireUserId();
         if (!existingBucket.getOwnerId().equals(userId)) {
             return Result.error("无权限更新该存储桶");
         }
@@ -196,7 +194,7 @@ public class StorageBucketsController {
     public Result<String> setDefaultBucket(
             @Parameter(description = "存储桶ID") @PathVariable @NotNull @Positive Long bucketId) {
         
-        Long userId = Long.valueOf(StpUtil.getLoginId().toString());
+        Long userId = UserContext.requireUserId();
         boolean result = storageBucketsService.setDefaultBucket(userId, bucketId);
         
         if (result) {
@@ -215,7 +213,7 @@ public class StorageBucketsController {
         @ApiResponse(responseCode = "200", description = "获取成功")
     })
     public Result<StorageBuckets> getDefaultBucket() {
-        Long userId = Long.valueOf(StpUtil.getLoginId().toString());
+        Long userId = UserContext.requireUserId();
         StorageBuckets defaultBucket = storageBucketsService.getDefaultBucket(userId);
         
         if (defaultBucket != null) {
@@ -235,7 +233,7 @@ public class StorageBucketsController {
         @ApiResponse(responseCode = "200", description = "获取成功")
     })
     public Result<BucketInfoDTO> getBucketInfo() {
-        Long userId = Long.valueOf(StpUtil.getLoginId().toString());
+        Long userId = UserContext.requireUserId();
         
         // 一次查询获取所有存储桶
         List<StorageBuckets> allBuckets = storageBucketsService.getBucketsByUserId(userId);

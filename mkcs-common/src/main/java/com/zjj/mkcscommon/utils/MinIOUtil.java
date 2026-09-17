@@ -1,7 +1,6 @@
 package com.zjj.mkcscommon.utils;
 
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -9,22 +8,29 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.*;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedUploadPartRequest;
+import software.amazon.awssdk.services.s3.presigner.model.UploadPartPresignRequest;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.io.InputStream;
 import java.net.URI;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
  * MinIO 工具类
  */
-@RequiredArgsConstructor
 @Slf4j
 @Getter
 public class MinIOUtil {
     private final String endpoint;
+    private final String publicEndpoint;
     private final String accessKey;
     private final String secretKey;
     private final String bucketName;
@@ -35,6 +41,26 @@ public class MinIOUtil {
      * 缓存的 S3Client 实例
      */
     private S3Client s3Client;
+    private S3Presigner s3Presigner;
+
+    /**
+     * Internal object location used for S3 API calls. Object URLs must never be
+     * passed to the SDK as an object key.
+     */
+    public record ObjectLocation(String bucketName, String objectKey) {
+    }
+
+    public MinIOUtil(String endpoint, String accessKey, String secretKey, String bucketName) {
+        this(endpoint, endpoint, accessKey, secretKey, bucketName);
+    }
+
+    public MinIOUtil(String endpoint, String publicEndpoint, String accessKey, String secretKey, String bucketName) {
+        this.endpoint = endpoint;
+        this.publicEndpoint = publicEndpoint == null || publicEndpoint.isBlank() ? endpoint : publicEndpoint;
+        this.accessKey = accessKey;
+        this.secretKey = secretKey;
+        this.bucketName = bucketName;
+    }
 
     /**
      * 初始化 S3Client，在对象创建后执行一次
@@ -53,6 +79,13 @@ public class MinIOUtil {
                 .credentialsProvider(() -> software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create(accessKey, secretKey))
                 .serviceConfiguration(s3Configuration)
                 .build();
+
+        this.s3Presigner = S3Presigner.builder()
+                .endpointOverride(URI.create(publicEndpoint))
+                .region(MINIO_REGION)
+                .credentialsProvider(() -> software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create(accessKey, secretKey))
+                .serviceConfiguration(s3Configuration)
+                .build();
                 
         log.info("MinIO S3Client 初始化完成");
     }
@@ -66,6 +99,9 @@ public class MinIOUtil {
             log.info("关闭 MinIO S3Client");
             s3Client.close();
         }
+        if (s3Presigner != null) {
+            s3Presigner.close();
+        }
     }
 
     /**
@@ -78,6 +114,82 @@ public class MinIOUtil {
             throw new IllegalStateException("S3Client 未初始化，请确保对象已正确创建并调用了 @PostConstruct 方法");
         }
         return s3Client;
+    }
+
+    public String createMultipartUpload(String bucketName, String objectKey, String contentType) {
+        try {
+            String uploadId = getS3Client().createMultipartUpload(CreateMultipartUploadRequest.builder()
+                    .bucket(bucketName).key(objectKey).contentType(contentType).build()).uploadId();
+            if (uploadId == null || uploadId.isBlank()) {
+                throw new IllegalStateException("MinIO未返回Multipart上传ID");
+            }
+            return uploadId;
+        } catch (Exception e) {
+            throw new RuntimeException("初始化MinIO分片上传失败", e);
+        }
+    }
+
+    public String presignUploadPart(String bucketName, String objectKey, String uploadId, int partNumber, Duration signatureDuration) {
+        if (s3Presigner == null) {
+            throw new IllegalStateException("S3Presigner未初始化");
+        }
+        UploadPartRequest uploadPartRequest = UploadPartRequest.builder()
+                .bucket(bucketName).key(objectKey).uploadId(uploadId).partNumber(partNumber).build();
+        PresignedUploadPartRequest presigned = s3Presigner.presignUploadPart(UploadPartPresignRequest.builder()
+                .signatureDuration(signatureDuration).uploadPartRequest(uploadPartRequest).build());
+        return presigned.url().toString();
+    }
+
+    /** Generates a browser-accessible, short-lived URL for downloading one object. */
+    public String presignDownload(String bucketName, String objectKey, String downloadFilename, Duration signatureDuration) {
+        if (s3Presigner == null) {
+            throw new IllegalStateException("S3Presigner未初始化");
+        }
+        String contentDisposition = "attachment; filename*=UTF-8''" + encodeContentDispositionFilename(downloadFilename);
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(bucketName)
+                .key(objectKey)
+                .responseContentDisposition(contentDisposition)
+                .build();
+        PresignedGetObjectRequest presigned = s3Presigner.presignGetObject(GetObjectPresignRequest.builder()
+                .signatureDuration(signatureDuration)
+                .getObjectRequest(getObjectRequest)
+                .build());
+        return presigned.url().toString();
+    }
+
+    private String encodeContentDispositionFilename(String filename) {
+        if (filename == null || filename.isBlank()) {
+            return "download";
+        }
+        return java.net.URLEncoder.encode(filename, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
+    public List<Part> listMultipartUploadParts(String bucketName, String objectKey, String uploadId) {
+        List<Part> parts = new ArrayList<>();
+        Integer marker = null;
+        do {
+            ListPartsResponse response = getS3Client().listParts(ListPartsRequest.builder()
+                    .bucket(bucketName).key(objectKey).uploadId(uploadId).partNumberMarker(marker).maxParts(1000).build());
+            parts.addAll(response.parts());
+            marker = response.isTruncated() ? response.nextPartNumberMarker() : null;
+        } while (marker != null);
+        return parts;
+    }
+
+    public void completeMultipartUpload(String bucketName, String objectKey, String uploadId, List<CompletedPart> parts) {
+        getS3Client().completeMultipartUpload(CompleteMultipartUploadRequest.builder()
+                .bucket(bucketName).key(objectKey).uploadId(uploadId)
+                .multipartUpload(CompletedMultipartUpload.builder().parts(parts).build()).build());
+    }
+
+    public void abortMultipartUpload(String bucketName, String objectKey, String uploadId) {
+        getS3Client().abortMultipartUpload(AbortMultipartUploadRequest.builder()
+                .bucket(bucketName).key(objectKey).uploadId(uploadId).build());
+    }
+
+    public long getObjectSize(String bucketName, String objectKey) {
+        return getS3Client().headObject(HeadObjectRequest.builder().bucket(bucketName).key(objectKey).build()).contentLength();
     }
 
     /**
@@ -116,6 +228,85 @@ public class MinIOUtil {
                     : normalizedEndpoint + objectUri.getRawPath() + "?" + query;
         } catch (IllegalArgumentException exception) {
             return objectUrl;
+        }
+    }
+
+    /**
+     * Parses the persisted file-content location into the bucket and object key
+     * required by the S3 client.
+     *
+     * <p>New records use {@code bucket/object-key}; old records may contain a
+     * complete URL generated by this MinIO deployment. Only URLs belonging to a
+     * configured MinIO host and the expected bucket are accepted.</p>
+     *
+     * @param storagePath persisted storage location
+     * @param expectedBucket bucket that is allowed for this operation
+     * @return validated S3 object location
+     * @throws IllegalArgumentException when the persisted path is malformed or
+     *         points outside the expected bucket
+     */
+    public ObjectLocation parseStoragePath(String storagePath, String expectedBucket) {
+        if (storagePath == null || storagePath.isBlank() || expectedBucket == null || expectedBucket.isBlank()) {
+            throw new IllegalArgumentException("对象存储路径不能为空");
+        }
+
+        String bucketName;
+        String objectKey;
+        if (storagePath.startsWith("http://") || storagePath.startsWith("https://")) {
+            URI storageUri;
+            try {
+                storageUri = URI.create(storagePath);
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("对象存储URL格式不正确", exception);
+            }
+            if (!isConfiguredMinioHost(storageUri)) {
+                throw new IllegalArgumentException("对象存储URL不属于当前MinIO服务");
+            }
+            String path = storageUri.getPath();
+            String prefix = "/" + expectedBucket + "/";
+            if (path == null || !path.startsWith(prefix)) {
+                throw new IllegalArgumentException("对象存储URL不属于预期存储桶");
+            }
+            bucketName = expectedBucket;
+            objectKey = path.substring(prefix.length());
+        } else {
+            String prefix = expectedBucket + "/";
+            if (!storagePath.startsWith(prefix)) {
+                throw new IllegalArgumentException("对象存储路径不属于预期存储桶");
+            }
+            bucketName = expectedBucket;
+            objectKey = storagePath.substring(prefix.length());
+        }
+
+        validateObjectKey(objectKey);
+        return new ObjectLocation(bucketName, objectKey);
+    }
+
+    private boolean isConfiguredMinioHost(URI storageUri) {
+        if (storageUri.getHost() == null || storageUri.getUserInfo() != null) {
+            return false;
+        }
+        return isSameHost(storageUri, endpoint) || isSameHost(storageUri, publicEndpoint);
+    }
+
+    private boolean isSameHost(URI storageUri, String configuredEndpoint) {
+        try {
+            URI endpointUri = URI.create(configuredEndpoint);
+            return endpointUri.getHost() != null && endpointUri.getHost().equalsIgnoreCase(storageUri.getHost());
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
+    }
+
+    private void validateObjectKey(String objectKey) {
+        if (objectKey == null || objectKey.isBlank() || objectKey.indexOf('\\') >= 0) {
+            throw new IllegalArgumentException("对象键不合法");
+        }
+        for (String segment : objectKey.split("/", -1)) {
+            if (segment.isEmpty() || ".".equals(segment) || "..".equals(segment)
+                    || segment.chars().anyMatch(Character::isISOControl)) {
+                throw new IllegalArgumentException("对象键不合法");
+            }
         }
     }
 
@@ -374,6 +565,31 @@ public class MinIOUtil {
     }
 
     /**
+     * Gets a bounded object range without downloading the whole object.
+     */
+    public InputStream getObjectRange(String bucketName, String objectName, long offset, int length) {
+        return getObjectRange(bucketName, objectName, offset, (long) length);
+    }
+
+    /**
+     * Gets an object byte range. The length is deliberately a long so a valid
+     * HTTP range is not constrained by the Java array size limit.
+     */
+    public InputStream getObjectRange(String bucketName, String objectName, long offset, long length) {
+        if (offset < 0 || length <= 0) {
+            throw new IllegalArgumentException("对象范围参数不合法");
+        }
+        try {
+            String range = "bytes=" + offset + "-" + (offset + length - 1L);
+            return getS3Client().getObject(GetObjectRequest.builder()
+                    .bucket(bucketName).key(objectName).range(range).build());
+        } catch (Exception e) {
+            log.error("获取对象范围失败: bucket={}, objectKey={}, offset={}, length={}", bucketName, objectName, offset, length, e);
+            throw new RuntimeException("获取对象范围失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * 上传流到对象
      *
      * @param inputStream 输入流
@@ -442,18 +658,11 @@ public class MinIOUtil {
      */
     public String getPresignedUrl(String bucketName, String objectName, int expiration) {
         try {
-            S3Client client = getS3Client();
-            
-            GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                    .bucket(bucketName)
-                    .key(objectName)
-                    .build();
-                    
-            // 注意：AWS SDK v2 的预签名URL生成方式
-            // 这里需要使用 S3Presigner，但为了简化，我们返回直接访问URL
-            String url = String.format("%s/%s/%s", endpoint, bucketName, objectName);
-            log.info("生成对象 {}/{} 的访问URL: {}", bucketName, objectName, url);
-            return url;
+            if (expiration <= 0) {
+                throw new IllegalArgumentException("预签名URL有效期必须大于0");
+            }
+            String filename = objectName.substring(objectName.lastIndexOf('/') + 1);
+            return presignDownload(bucketName, objectName, filename, Duration.ofSeconds(expiration));
             
         } catch (Exception e) {
             log.error("生成对象 {}/{} 的预签名URL失败: {}", bucketName, objectName, e.getMessage(), e);

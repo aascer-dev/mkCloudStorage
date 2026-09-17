@@ -1,6 +1,9 @@
 package cn.zjj.mkcsserver.controller;
 
-import cn.dev33.satoken.stp.StpUtil;
+import cn.zjj.mkcsmodel.dto.RefreshTokenRequest;
+import cn.zjj.mkcsserver.auth.TokenPair;
+import cn.zjj.mkcsserver.auth.TokenService;
+import cn.zjj.mkcsserver.auth.UserContext;
 import cn.zjj.mkcsmodel.dto.*;
 import cn.zjj.mkcsmodel.entity.Users;
 import cn.zjj.mkcsmodel.vo.AvailabilityResponse;
@@ -38,6 +41,7 @@ public class AuthController {
     private final UsersService usersService;
     private final VerificationCodeService verificationCodeService;
     private final OAuth2Service oauth2Service;
+    private final TokenService tokenService;
     
     @Value("${oauth2.frontend-callback-url:/oauth2-demo.html}")
     private String frontendCallbackUrl;
@@ -78,9 +82,8 @@ public class AuthController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "登出成功")
     })
-    public Result<String> logout() {
-        StpUtil.checkLogin();
-        StpUtil.logout();
+    public Result<String> logout(@Valid @RequestBody RefreshTokenRequest request) {
+        tokenService.logout(request.getRefreshToken());
         return Result.success("登出成功");
     }
 
@@ -97,7 +100,7 @@ public class AuthController {
     public Result<Map<String, Object>> checkLogin() {
 
         //判断是否登录
-        Assert.isTrue(StpUtil.isLogin(), ResultCode.NOT_LOGIN);
+        UserContext.requireUserId();
         return Result.success("用户已登录", null);
     }
 
@@ -110,18 +113,8 @@ public class AuthController {
             @ApiResponse(responseCode = "200", description = "刷新成功"),
             @ApiResponse(responseCode = "401", description = "未登录")
     })
-    public Result<Map<String, Object>> refreshToken() {
-        // 检查登录状态
-        Assert.isTrue(StpUtil.isLogin(), ResultCode.NOT_LOGIN);
-
-        // 刷新Token（延长有效期）// 延长7天
-        StpUtil.renewTimeout(7 * 24 * 60 * 60);
-
-        Map<String, Object> data = new HashMap<>();
-        data.put("token", StpUtil.getTokenValue());
-        data.put("expiresIn", StpUtil.getTokenTimeout());
-
-        return Result.success("Token刷新成功", data);
+    public Result<TokenPair> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
+        return Result.success("Token刷新成功", tokenService.refresh(request.getRefreshToken()));
     }
 
     // 1. 检查用户名是否可用
@@ -261,14 +254,13 @@ public class AuthController {
                     
                     // 构建重定向 URL，将 token 和用户信息传递给前端
                     String redirectUrl = String.format(
-                        "%s?token=%s&userId=%d&username=%s&success=true",
+                        "%s?userId=%d&username=%s&success=true",
                         frontendCallbackUrl,
-                        loginResponse.getToken(),
                         loginResponse.getId(),
                         loginResponse.getUsername()
                     );
                     
-                    log.info("GitHub OAuth2 登录成功，重定向到前端: {}", redirectUrl);
+                    log.info("GitHub OAuth2 登录成功，重定向到前端");
                     response.sendRedirect(redirectUrl);
                 } else if (data instanceof Map) {
                     // Registration required
@@ -384,8 +376,7 @@ public class AuthController {
     @GetMapping("/oauth2/bindings")
     @Operation(summary = "获取 OAuth2 绑定列表", description = "获取当前用户的所有 OAuth2 绑定")
     public Result<Map<String, Object>> getOAuthBindings() {
-        StpUtil.checkLogin();
-        Long userId = Long.parseLong((String) StpUtil.getLoginId());
+        Long userId = UserContext.requireUserId();
         return oauth2Service.getUserOAuthBindings(userId);
     }
     
@@ -395,8 +386,7 @@ public class AuthController {
     @DeleteMapping("/oauth2/bindings/{provider}")
     @Operation(summary = "解除 OAuth2 绑定", description = "解除指定平台的 OAuth2 绑定")
     public Result<Void> unbindOAuth(@PathVariable String provider) {
-        StpUtil.checkLogin();
-        Long userId = Long.parseLong((String) StpUtil.getLoginId());
+        Long userId = UserContext.requireUserId();
         return oauth2Service.unbindOAuth(userId, provider);
     }
 

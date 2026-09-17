@@ -1,5 +1,6 @@
 package cn.zjj.mkcsserver.handler;
 
+import cn.zjj.mkcsserver.auth.AccessDeniedException;
 import com.zjj.mkcscommon.result.BusinessException;
 import com.zjj.mkcscommon.result.Result;
 import com.zjj.mkcscommon.enumeration.ResultCode;
@@ -18,10 +19,6 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import java.util.Set;
 
-import cn.dev33.satoken.exception.NotLoginException;
-import cn.dev33.satoken.exception.NotPermissionException;
-import cn.dev33.satoken.exception.NotRoleException;
-import cn.dev33.satoken.exception.SaTokenException;
 
 /**
  * 全局异常处理器
@@ -31,46 +28,6 @@ import cn.dev33.satoken.exception.SaTokenException;
 public class GlobalExceptionHandler {
     
     /**
-     * 处理Sa-Token未登录异常
-     */
-    @ExceptionHandler(NotLoginException.class)
-    @ResponseStatus(HttpStatus.UNAUTHORIZED)
-    public Result<Void> handleNotLoginException(NotLoginException e, HttpServletRequest request) {
-        log.warn("未登录请求: uri={}, type={}", request.getRequestURI(), e.getType());
-        return Result.error(ResultCode.UNAUTHORIZED);
-    }
-    
-    /**
-     * 处理Sa-Token权限不足异常
-     */
-    @ExceptionHandler(NotPermissionException.class)
-    @ResponseStatus(HttpStatus.FORBIDDEN)
-    public Result<Void> handleNotPermissionException(NotPermissionException e, HttpServletRequest request) {
-        log.warn("权限拒绝: uri={}", request.getRequestURI());
-        return Result.error(ResultCode.PERMISSION_DENIED);
-    }
-    
-    /**
-     * 处理Sa-Token角色不足异常
-     */
-    @ExceptionHandler(NotRoleException.class)
-    @ResponseStatus(HttpStatus.FORBIDDEN)
-    public Result<Void> handleNotRoleException(NotRoleException e, HttpServletRequest request) {
-        log.warn("角色访问被拒绝: uri={}", request.getRequestURI());
-        return Result.error(ResultCode.PERMISSION_DENIED);
-    }
-    
-    /**
-     * 处理Sa-Token其他异常
-     */
-    @ExceptionHandler(SaTokenException.class)
-    @ResponseStatus(HttpStatus.UNAUTHORIZED)
-    public Result<Void> handleSaTokenException(SaTokenException e, HttpServletRequest request) {
-        log.warn("Sa-Token请求失败: uri={}, exceptionType={}", request.getRequestURI(), e.getClass().getSimpleName());
-        return Result.error(ResultCode.UNAUTHORIZED);
-    }
-    
-    /**
      * 处理业务异常
      */
     @ExceptionHandler(BusinessException.class)
@@ -78,6 +35,13 @@ public class GlobalExceptionHandler {
     public Result<Void> handleBusinessException(BusinessException e, HttpServletRequest request) {
         log.warn("业务异常: {} - {}", request.getRequestURI(), e.getMessage());
         return Result.error(e.getCode(), e.getMessage());
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public Result<Void> handleAccessDeniedException(AccessDeniedException exception, HttpServletRequest request) {
+        log.warn("权限拒绝: uri={}", request.getRequestURI());
+        return Result.error(ResultCode.PERMISSION_DENIED);
     }
     
     /**

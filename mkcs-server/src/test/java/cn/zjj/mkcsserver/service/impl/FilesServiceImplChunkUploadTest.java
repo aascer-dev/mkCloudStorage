@@ -1,9 +1,13 @@
 package cn.zjj.mkcsserver.service.impl;
 
 import cn.zjj.mkcsmodel.entity.Files;
+import cn.zjj.mkcsmodel.entity.FileContents;
+import cn.zjj.mkcsmodel.vo.FilePreviewUrlResponse;
 import cn.zjj.mkcsmodel.vo.ChunkUploadResponse;
 import cn.zjj.mkcsserver.mapper.FilesMapper;
 import cn.zjj.mkcsserver.service.FileContentsService;
+import cn.zjj.mkcsserver.service.StorageBucketsService;
+import cn.zjj.mkcsserver.service.UploadTasksService;
 import com.zjj.mkcscommon.utils.MinIOUtil;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,18 +17,23 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.HashMap;
+import java.io.ByteArrayInputStream;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -46,7 +55,19 @@ class FilesServiceImplChunkUploadTest {
     private HashOperations<String, Object, Object> hashOperations;
 
     @Mock
+    private ValueOperations<String, Object> valueOperations;
+
+    @Mock
     private FileContentsService fileContentsService;
+
+    @Mock
+    private UploadTasksService uploadTasksService;
+
+    @Mock
+    private MultipartUploadPersistenceService multipartUploadPersistenceService;
+
+    @Mock
+    private StorageBucketsService storageBucketsService;
 
     @Mock
     private FilesMapper filesMapper;
@@ -56,9 +77,12 @@ class FilesServiceImplChunkUploadTest {
     @BeforeEach
     @SuppressWarnings({"unchecked", "rawtypes"})
     void setUp() {
-        filesService = new FilesServiceImpl(minIOUtil, redisTemplate, fileContentsService);
+        filesService = new FilesServiceImpl(minIOUtil, redisTemplate, fileContentsService, uploadTasksService,
+                multipartUploadPersistenceService, storageBucketsService);
         ReflectionTestUtils.setField(filesService, "baseMapper", filesMapper);
         lenient().when(redisTemplate.opsForHash()).thenReturn((HashOperations) hashOperations);
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        lenient().when(storageBucketsService.reserveStorage(any(), any(), anyLong())).thenReturn(true);
     }
 
     @Test
@@ -139,6 +163,100 @@ class FilesServiceImplChunkUploadTest {
 
         assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_NOT_FOUND);
         verifyNoInteractions(minIOUtil, fileContentsService);
+    }
+
+    @Test
+    void downloadFileUsesParsedHistoricalObjectLocation() {
+        Files file = new Files();
+        file.setOwnerId(10L);
+        file.setStatus((byte) 1);
+        file.setIsFolder(false);
+        file.setFilename("image.png");
+        file.setContentId(8L);
+        FileContents content = new FileContents();
+        content.setStatus((byte) 1);
+        content.setSize(3L);
+        content.setMimeType("image/png");
+        content.setStoragePath("http://127.0.0.1:19000/files/legacy-object.png");
+        when(filesMapper.selectById(7L)).thenReturn(file);
+        when(fileContentsService.getById(8L)).thenReturn(content);
+        MinIOUtil.ObjectLocation location = new MinIOUtil.ObjectLocation("files", "legacy-object.png");
+        when(minIOUtil.parseStoragePath(content.getStoragePath(), "files")).thenReturn(location);
+        when(minIOUtil.getObject("files", "legacy-object.png")).thenReturn(new ByteArrayInputStream(new byte[]{1, 2, 3}));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filesService.downloadFile(10L, 7L, response);
+
+        verify(minIOUtil).getObject("files", "legacy-object.png");
+        assertThat(response.getContentAsByteArray()).containsExactly(1, 2, 3);
+        assertThat(response.getContentType()).isEqualTo("image/png");
+    }
+
+    @Test
+    void previewStreamsRequestedRangeForAValidShortLivedTicket() {
+        Files file = new Files();
+        file.setOwnerId(10L);
+        file.setStatus((byte) 1);
+        file.setIsFolder(false);
+        file.setFilename("clip.mp4");
+        file.setContentId(8L);
+        FileContents content = new FileContents();
+        content.setStatus((byte) 1);
+        content.setSize(10L);
+        content.setMimeType("video/mp4");
+        content.setStoragePath("files/clip.mp4");
+        when(valueOperations.get("file:preview-ticket:123e4567-e89b-12d3-a456-426614174000")).thenReturn("10:7");
+        when(filesMapper.selectById(7L)).thenReturn(file);
+        when(fileContentsService.getById(8L)).thenReturn(content);
+        when(minIOUtil.parseStoragePath(content.getStoragePath(), "files"))
+                .thenReturn(new MinIOUtil.ObjectLocation("files", "clip.mp4"));
+        when(minIOUtil.getObjectRange("files", "clip.mp4", 2L, 3L))
+                .thenReturn(new ByteArrayInputStream(new byte[]{3, 4, 5}));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filesService.previewFile(7L, "123e4567-e89b-12d3-a456-426614174000", "bytes=2-4", response);
+
+        assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_PARTIAL_CONTENT);
+        assertThat(response.getHeader("Content-Range")).isEqualTo("bytes 2-4/10");
+        assertThat(response.getHeader("Accept-Ranges")).isEqualTo("bytes");
+        assertThat(response.getHeader("Content-Disposition")).contains("inline");
+        assertThat(response.getContentAsByteArray()).containsExactly(3, 4, 5);
+    }
+
+    @Test
+    void previewUrlUsesAShortLivedOpaqueTicketInsteadOfTheLoginToken() {
+        Files file = new Files();
+        file.setOwnerId(10L);
+        file.setStatus((byte) 1);
+        file.setIsFolder(false);
+        when(filesMapper.selectById(7L)).thenReturn(file);
+
+        FilePreviewUrlResponse response = filesService.createPreviewUrl(10L, 7L);
+
+        assertThat(response.getPreviewUrl()).startsWith("/api/files/preview/7?ticket=");
+        assertThat(response.getExpiresInSeconds()).isEqualTo(300);
+        verify(valueOperations).set(startsWith("file:preview-ticket:"), eq("10:7"), eq(300L), eq(TimeUnit.SECONDS));
+    }
+
+    @Test
+    void deleteFileReleasesTheLogicalFileCapacity() {
+        Files file = new Files();
+        file.setOwnerId(10L);
+        file.setStatus((byte) 1);
+        file.setIsFolder(false);
+        file.setContentId(8L);
+        file.setBucketId(9L);
+        file.setSize(5L);
+        FileContents content = new FileContents();
+        content.setReferenceCount(1);
+        when(filesMapper.selectById(7L)).thenReturn(file);
+        when(filesMapper.updateById(file)).thenReturn(1);
+        when(fileContentsService.getById(8L)).thenReturn(content);
+
+        filesService.deleteFile(10L, 7L);
+
+        verify(storageBucketsService).releaseStorage(9L, 5L);
+        assertThat(content.getReferenceCount()).isZero();
     }
 
     private MockMultipartFile chunk() {

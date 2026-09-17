@@ -80,7 +80,7 @@ USE mkCloudStorage;
 SOURCE sql/mkCloudStorage.sql;
 ```
 
-`sql/` 是数据库脚本的唯一执行来源。`mkCloudStorage.sql` 会重建表，只能用于新库或明确允许重建的环境；已有库必须备份后按版本顺序执行尚未应用的 `VYYYYMMDD_NNN__*.sql`。项目当前未引入自动迁移工具，应用启动不会执行 SQL；详细执行顺序、验证与回滚边界见 [`sql/README.md`](sql/README.md)。
+应用启动时由 Flyway 自动执行 `mkcs-server/src/main/resources/db/migration/` 中未应用的版本化 SQL。空库会先执行 `V1__initial_schema.sql`；已有库首次接入时记录 V1 基线，再执行后续的幂等增量迁移。执行历史保存在 `flyway_schema_history`，已执行的迁移文件不可修改。`sql/mkCloudStorage.sql` 仅保留为人工查看和恢复用的 schema 快照，不能再作为常规部署入口。
 
 ### 编译与运行
 
@@ -142,6 +142,12 @@ API 文档（Swagger）：http://localhost:8080/swagger-ui.html
 4. 未命中则上传到 MinIO 共享 `files` 桶，创建新记录
 
 物理存储共享（MinIO `files` 桶），用户隔离通过数据库 `owner_id` 实现。
+
+### 大文件 Multipart 直传
+
+超过 16 MiB 的文件由前端走 `/api/files/multipart/*`：后端只初始化任务、签发每个 Part 的短期 UploadPart URL、查询 MinIO 已上传 Part、完成或中止上传；浏览器直接把二进制写入 MinIO，服务端不再合并临时对象。
+
+部署时应将 `MKCS_MINIO_PUBLIC_ENDPOINT` 配为浏览器可访问且与签名一致的 MinIO 地址。MinIO 必须允许前端 Origin 的 `PUT`、`GET`、`HEAD` 请求，并暴露 `ETag` 响应头；否则浏览器无法取得分片 ETag 来完成上传。未完成 Multipart 上传还应配置 MinIO 生命周期规则自动 Abort，作为应用过期任务清理的兜底。
 
 ### 存储桶（逻辑隔离）
 

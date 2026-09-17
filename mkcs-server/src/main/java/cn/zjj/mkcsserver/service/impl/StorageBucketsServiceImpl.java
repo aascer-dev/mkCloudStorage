@@ -33,6 +33,24 @@ import java.util.List;
 public class StorageBucketsServiceImpl extends ServiceImpl<StorageBucketsMapper, StorageBuckets> implements StorageBucketsService {
 
     @Override
+    public boolean reserveStorage(Long bucketId, Long ownerId, long size) {
+        Assert.notNull(bucketId, "存储桶ID不能为空");
+        Assert.notNull(ownerId, "用户ID不能为空");
+        if (size <= 0) {
+            return true;
+        }
+        return baseMapper.reserveStorage(bucketId, ownerId, size) == 1;
+    }
+
+    @Override
+    public void releaseStorage(Long bucketId, long size) {
+        Assert.notNull(bucketId, "存储桶ID不能为空");
+        if (size > 0) {
+            baseMapper.releaseStorage(bucketId, size);
+        }
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public StorageBuckets createBucket(String bucketName, String description, Long userId) {
         Assert.notNull(userId, "用户ID不能为空");

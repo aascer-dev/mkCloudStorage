@@ -1,11 +1,4 @@
-sa-token:
-  token-style: jwt
-  jwt-secret-key: ${MKCS_JWT_SECRET_KEY}
-  token-prefix: Bearer
-
 mkcs:
-  jwt:
-    secret-key: ${MKCS_JWT_SECRET_KEY}
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     host: localhost
@@ -22,6 +15,7 @@ mkcs:
     access-key: ${MKCS_MINIO_ACCESS_KEY}
     secret-key: ${MKCS_MINIO_SECRET_KEY}
     endpoint: ${MKCS_MINIO_ENDPOINT}
+    public-endpoint: ${MKCS_MINIO_PUBLIC_ENDPOINT:${MKCS_MINIO_ENDPOINT}}
     bucket-name: sky-take-out
   rabbitmq:
     host: 127.0.0.1

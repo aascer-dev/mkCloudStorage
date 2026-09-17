@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="大文件上传现状">
+    <mxGraphModel dx="1120" dy="650" grid="1" gridSize="10" page="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="客户端&#xa;计算文件 hash、切片" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="30" y="180" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="POST /chunk/init&#xa;校验 hash 是否已存在" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="260" y="80" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="已存在：秒传&#xa;新增 files 引用，计数 +1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="540" y="30" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="Redis&#xa;upload:task:{uploadId}&#xa;任务元数据 + 已传索引集合&#xa;TTL 24h，每片续期" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="530" y="160" width="230" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="6" value="POST /chunk/upload&#xa;认证、任务归属、索引、非空校验&#xa;重复索引直接成功" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="250" y="300" width="220" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="7" value="MinIO chunks 桶&#xa;{uploadId}/{chunkIndex}" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="530" y="330" width="230" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="8" value="POST /chunk/complete&#xa;检查索引 0…N-1 全部存在" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="250" y="490" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="9" value="服务端依次读取全部临时对象&#xa;SequenceInputStream 拼接后上传" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="530" y="490" width="230" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="10" value="MinIO files 桶&#xa;UUID + 原扩展名" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="840" y="430" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="11" value="MySQL&#xa;file_contents + files&#xa;保存内容与逻辑文件元数据" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="840" y="540" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="12" value="初始化" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="2" target="3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="13" value="命中" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="3" target="4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="14" value="未命中，创建任务" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="3" target="5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="15" value="上传每片" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="2" target="6"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="16" value="读取/更新任务" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.8;entryDx=0;entryDy=0;" edge="1" parent="1" source="6" target="5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="17" value="写入临时分片" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="6" target="7"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="18" value="完成" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.95;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="2" target="8"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="19" value="校验索引集合" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="8" target="9"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="20" value="按序读取并删除临时片" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="9" target="7"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="21" value="写入合并对象" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.35;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="9" target="10"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="22" value="创建元数据，删 Redis 任务" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="10" target="11"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

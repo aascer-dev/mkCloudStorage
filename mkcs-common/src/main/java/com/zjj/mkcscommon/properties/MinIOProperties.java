@@ -13,6 +13,8 @@ import org.springframework.stereotype.Component;
 public class MinIOProperties {
 
     private String endpoint;
+    /** Browser-reachable endpoint used when signing direct upload URLs. */
+    private String publicEndpoint;
     private String accessKey;
     private String secretKey;
     private String bucketName;

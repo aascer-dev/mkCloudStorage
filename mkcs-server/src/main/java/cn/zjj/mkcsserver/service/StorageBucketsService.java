@@ -18,6 +18,15 @@ import java.util.List;
 public interface StorageBucketsService extends IService<StorageBuckets> {
 
     /**
+     * Atomically reserves bytes for a new logical file in a bucket owned by the
+     * user. Returns {@code false} if the bucket is unavailable or out of quota.
+     */
+    boolean reserveStorage(Long bucketId, Long ownerId, long size);
+
+    /** Releases bytes after a logical file is deleted. */
+    void releaseStorage(Long bucketId, long size);
+
+    /**
      * 创建存储桶
      * @param bucketName 存储桶名称
      * @param description 描述

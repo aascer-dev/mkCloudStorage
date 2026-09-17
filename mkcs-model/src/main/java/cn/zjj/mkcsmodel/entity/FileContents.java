@@ -75,13 +75,13 @@ public class FileContents extends BaseEntity {
     private Long randomOffset;
 
     /**
-     * 随机位置校验 - 字节长度（默认256KB）
+     * 随机位置校验 - 字节长度（最大256KB）
      */
     @TableField("random_length")
     private Integer randomLength;
 
     /**
-     * 随机位置校验 - 该位置数据的MD5 hash（用于秒传验证）
+     * 随机位置校验 - 该位置数据的MD5摘要（用于秒传挑战验证）
      */
     @TableField("random_position_hash")
     private String randomPositionHash;

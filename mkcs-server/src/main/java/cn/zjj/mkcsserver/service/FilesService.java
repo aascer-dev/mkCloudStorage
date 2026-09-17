@@ -3,6 +3,14 @@ package cn.zjj.mkcsserver.service;
 import cn.zjj.mkcsmodel.entity.Files;
 import cn.zjj.mkcsmodel.vo.ChunkUploadResponse;
 import cn.zjj.mkcsmodel.vo.FileUploadResponse;
+import cn.zjj.mkcsmodel.vo.FilePreviewUrlResponse;
+import cn.zjj.mkcsmodel.dto.MultipartUploadCompleteRequest;
+import cn.zjj.mkcsmodel.dto.MultipartUploadInitRequest;
+import cn.zjj.mkcsmodel.dto.MultipartUploadPresignRequest;
+import cn.zjj.mkcsmodel.dto.MultipartSecondUploadVerifyRequest;
+import cn.zjj.mkcsmodel.vo.MultipartUploadInitResponse;
+import cn.zjj.mkcsmodel.vo.MultipartUploadPresignResponse;
+import cn.zjj.mkcsmodel.vo.MultipartUploadStatusResponse;
 import com.baomidou.mybatisplus.extension.service.IService;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -15,6 +23,18 @@ import java.util.List;
  * @author 34978
  */
 public interface FilesService extends IService<Files> {
+
+    MultipartUploadInitResponse initMultipartUpload(Long userId, MultipartUploadInitRequest request);
+
+    FileUploadResponse verifyMultipartSecondUpload(Long userId, MultipartSecondUploadVerifyRequest request);
+
+    MultipartUploadPresignResponse presignMultipartPart(Long userId, MultipartUploadPresignRequest request);
+
+    MultipartUploadStatusResponse getMultipartUploadStatus(Long userId, Long uploadId);
+
+    FileUploadResponse completeMultipartUpload(Long userId, MultipartUploadCompleteRequest request);
+
+    void cancelMultipartUpload(Long userId, Long uploadId);
 
     /**
      * 检查文件是否存在（秒传检查）
@@ -132,6 +152,15 @@ public interface FilesService extends IService<Files> {
      */
     void batchDeleteFiles(Long userId, List<Long> fileIds);
 
+    /** Lists files and folders currently in the caller's recycle bin. */
+    List<Files> getRecycleBinFiles(Long userId);
+
+    /** Restores selected recycle-bin entries, including their deleted descendants. */
+    void restoreFiles(Long userId, List<Long> fileIds);
+
+    /** Permanently removes selected recycle-bin entries and their deleted descendants. */
+    void permanentlyDeleteFiles(Long userId, List<Long> fileIds);
+
     /**
      * 重命名文件
      */
@@ -151,4 +180,10 @@ public interface FilesService extends IService<Files> {
      * 下载文件（流式输出到 HttpServletResponse）
      */
     void downloadFile(Long userId, Long fileId, HttpServletResponse response);
+
+    /** Creates a short-lived browser-native preview URL for an owned file. */
+    FilePreviewUrlResponse createPreviewUrl(Long userId, Long fileId);
+
+    /** Streams a ticket-authorized inline preview, including a single byte range. */
+    void previewFile(Long fileId, String ticket, String rangeHeader, HttpServletResponse response);
 }

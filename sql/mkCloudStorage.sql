@@ -300,6 +300,9 @@ CREATE TABLE `upload_tasks`  (
   `error_message` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '失败原因（可选）',
   `file_hash` char(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '文件整体 sha256（用于秒传/去重判断）',
   `temp_path` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '临时存储路径（分片临时目录或对象存储临时key前缀）',
+  `minio_upload_id` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT 'MinIO Multipart Upload ID',
+  `object_key` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '服务端生成的最终对象键',
+  `mime_type` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '文件MIME类型',
   `final_file_id` bigint UNSIGNED NULL DEFAULT NULL COMMENT '完成后关联的 files.id（成功后填写）',
   `created_at` datetime NULL DEFAULT NULL COMMENT '创建时间',
   `updated_at` datetime NULL DEFAULT NULL COMMENT '更新时间',
@@ -310,6 +313,8 @@ CREATE TABLE `upload_tasks`  (
   INDEX `idx_user_id_status`(`user_id` ASC, `status` ASC, `updated_at` DESC) USING BTREE,
   INDEX `idx_bucket_id`(`bucket_id` ASC) USING BTREE,
   INDEX `idx_final_file_id`(`final_file_id` ASC) USING BTREE,
+  UNIQUE INDEX `uk_minio_upload_id`(`minio_upload_id` ASC) USING BTREE,
+  INDEX `idx_upload_tasks_status_expire`(`status` ASC, `expire_time` ASC) USING BTREE,
   CONSTRAINT `fk_upload_tasks_bucket` FOREIGN KEY (`bucket_id`) REFERENCES `storage_buckets` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `fk_upload_tasks_file` FOREIGN KEY (`final_file_id`) REFERENCES `files` (`id`) ON DELETE SET NULL ON UPDATE RESTRICT,
   CONSTRAINT `fk_upload_tasks_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
