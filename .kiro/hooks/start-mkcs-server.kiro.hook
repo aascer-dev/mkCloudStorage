@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "启动 MKCS 服务器",
+  "description": "使用 Maven 启动 MKCS 云存储服务器，包含 Knife4j API 文档",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "请运行命令启动 MKCS 服务器：mvn spring-boot:run -pl mkcs-server -Dspring-boot.run.jvmArguments=\"-Dspring.profiles.active=dev\""
+  }
+}

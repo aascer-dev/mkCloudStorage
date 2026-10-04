@@ -1,0 +1,42 @@
+mkcs:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    host: localhost
+    port: 3306
+    database: mkCloudStorage
+    username: root
+    password: ${MKCS_DATASOURCE_PASSWORD}
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    password: ${MKCS_REDIS_PASSWORD}
+    database: 10
+  minio:
+    access-key: ${MKCS_MINIO_ACCESS_KEY}
+    secret-key: ${MKCS_MINIO_SECRET_KEY}
+    endpoint: ${MKCS_MINIO_ENDPOINT}
+    public-endpoint: ${MKCS_MINIO_PUBLIC_ENDPOINT:${MKCS_MINIO_ENDPOINT}}
+    bucket-name: sky-take-out
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: admin
+    password: ${MKCS_RABBITMQ_PASSWORD}
+    virtual-host: /
+  mail:
+    host: smtp.resend.com
+    port: 587
+    username: resend
+    password: ${MKCS_MAIL_PASSWORD}
+    from: noreply@20051215.xyz
+    from-name: MK Cloud Storage
+
+# OAuth2 配置
+oauth2:
+  github:
+    client-id: ${MKCS_OAUTH2_GITHUB_CLIENT_ID:}
+    client-secret: ${MKCS_OAUTH2_GITHUB_CLIENT_SECRET:}
+    # 重要：这是 GitHub 回调到后端的地址，必须是后端地址
+    redirect-uri: http://localhost:8080/api/auth/oauth2/github/callback
+  # 前端回调页面 URL（后端处理完成后重定向到前端的页面）
+  frontend-callback-url: http://localhost:5173/oauth/callback

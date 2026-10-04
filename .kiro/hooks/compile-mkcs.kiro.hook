@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "编译 MKCS 项目",
+  "description": "快速编译 MKCS 项目，跳过测试",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "请运行命令编译 MKCS 项目：mvn clean compile -DskipTests"
+  }
+}
