@@ -1,0 +1,175 @@
+server:
+  # 应用监听端口与 Tomcat 编码
+  port: 8080
+  tomcat:
+    uri-encoding: UTF-8
+    max-http-form-post-size: -1
+# 日志配置
+logging:
+  level:
+    root: INFO
+    web: INFO
+    org.springframework.mail: DEBUG
+    # 开启底层 JavaMail 的交互日志
+    jakarta.mail: DEBUG
+    org.springframework: WARN
+    # 禁用静态资源未找到的警告
+    org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: ERROR
+    org.springframework.web.servlet.resource: ERROR
+spring:
+  # Support launches from either the repository root or the mkcs-server module.
+  config:
+    import: optional:file:../.env[.properties],optional:file:./.env[.properties]
+  profiles:
+    # 当前激活的环境配置，指向 application-dev.yml
+    active: dev
+  main:
+    allow-circular-references: true
+    allow-bean-definition-overriding: true
+  # 禁用 favicon 警告
+  mvc:
+    favicon:
+      enabled: false
+    throw-exception-if-no-handler-found: false
+  servlet:
+    multipart:
+      enabled: true
+      # 单个文件的最大限制
+      max-file-size: -1
+      # 单次请求的总限制（包含表单其他字段）
+      max-request-size: -1
+  web:
+    resources:
+      add-mappings: true
+  datasource:
+    # 使用 Druid 数据源；具体连接信息来自 mkcs.* 外部配置
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: ${mkcs.datasource.driver-class-name}
+    url: jdbc:mysql://${mkcs.datasource.host}:${mkcs.datasource.port}/${mkcs.datasource.database}?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${mkcs.datasource.username}
+    password: ${mkcs.datasource.password}
+    druid:
+      # 连接池初始化与容量控制
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 60000
+      # 空闲检测与回收
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000
+      # 连接有效性校验
+      validation-query: SELECT 1 FROM DUAL
+      test-while-idle: true
+      test-on-borrow: true
+      test-on-return: false
+      # 预编译语句池配置
+      pool-prepared-statements: true
+      max-pool-prepared-statement-per-connection-size: 20
+      # 快速失败：数据库不可用时启动直接中断
+      fail-fast: true
+      break-after-acquire-failure: true
+      connection-error-retry-attempts: 0
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # Existing installations receive a V1 baseline; empty databases execute V1.
+    baseline-on-migrate: true
+    baseline-version: 1
+    validate-on-migrate: true
+    clean-disabled: true
+  data:
+    redis:
+      host: ${mkcs.redis.host}
+      port: ${mkcs.redis.port}
+      password: ${mkcs.redis.password}
+      database: ${mkcs.redis.database}
+      timeout: 10000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-wait: -1ms
+          max-idle: 8
+          min-idle: 0
+  rabbitmq:
+    host: ${mkcs.rabbitmq.host}
+    port: ${mkcs.rabbitmq.port}
+    username: ${mkcs.rabbitmq.username}
+    password: ${mkcs.rabbitmq.password}
+    virtual-host: ${mkcs.rabbitmq.virtual-host}
+    listener:
+      simple:
+        acknowledge-mode: auto
+        prefetch: 1
+        concurrency: 3
+        max-concurrency: 10
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000ms
+  mail:
+    host: ${mkcs.mail.host}
+    port: ${mkcs.mail.port}
+    username: ${mkcs.mail.username}
+    password: ${mkcs.mail.password}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: cn.zjj.mkcsmodel.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: assign_id        # 主键生成策略，雪花算法
+      # table-prefix: tbl_      # 可选表前缀
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+mkcs:
+  auth:
+    issuer: mkcs
+    access-token-ttl: 30m
+    refresh-token-ttl: 14d
+    secret-key: ${MKCS_JWT_SECRET_KEY}
+  cors:
+    allowed-origins: ${MKCS_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  minio:
+    access-key: ${mkcs.minio.access-key}
+    secret-key: ${mkcs.minio.secret-key}
+    endpoint: ${mkcs.minio.endpoint}
+    public-endpoint: ${MKCS_MINIO_PUBLIC_ENDPOINT:${mkcs.minio.endpoint}}
+    bucket-name: ${mkcs.minio.bucket-name}
+  crypto:
+    default-salt: mkcs-cloud-storage-salt           # 默认盐值
+    default-password: ${MKCS_CRYPTO_DEFAULT_PASSWORD}   # 默认对称加密密钥
+    bcrypt-strength: 12                             # BCrypt 强度 (4-31)
+
+# SpringDoc OpenAPI / Swagger UI 配置
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    tags-sorter: alpha
+    operations-sorter: alpha
+    display-request-duration: true
+    display-operation-id: false
+    default-models-expand-depth: 1
+    default-model-expand-depth: 1
+  show-actuator: false
+  writer-with-default-pretty-printer: true
+
+

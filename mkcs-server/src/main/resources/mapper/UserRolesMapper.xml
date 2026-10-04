@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.zjj.mkcsserver.mapper.UserRolesMapper">
+
+    <!-- 查询用户的角色信息 -->
+    <select id="selectUserRoles" resultType="cn.zjj.mkcsmodel.vo.UserRolePermissionVO$RoleVO">
+        SELECT 
+            r.id as roleId,
+            r.name as roleName,
+            r.description as roleDescription
+        FROM user_roles ur
+        INNER JOIN roles r ON ur.role_id = r.id
+        WHERE ur.user_id = #{userId}
+        ORDER BY r.name
+    </select>
+
+    <!-- 查询用户的所有权限信息（去重） -->
+    <select id="selectUserPermissions" resultType="cn.zjj.mkcsmodel.vo.UserRolePermissionVO$PermissionVO">
+        SELECT DISTINCT
+            p.id as permissionId,
+            p.name as permissionName,
+            p.description as permissionDescription
+        FROM user_roles ur
+        INNER JOIN roles r ON ur.role_id = r.id
+        INNER JOIN role_permissions rp ON r.id = rp.role_id
+        INNER JOIN permissions p ON rp.permission_id = p.id
+        WHERE ur.user_id = #{userId}
+        ORDER BY p.name
+    </select>
+
+    <!-- 查询角色的权限信息 -->
+    <select id="selectRolePermissions" resultType="cn.zjj.mkcsmodel.vo.UserRolePermissionVO$PermissionVO">
+        SELECT 
+            p.id as permissionId,
+            p.name as permissionName,
+            p.description as permissionDescription
+        FROM role_permissions rp
+        INNER JOIN permissions p ON rp.permission_id = p.id
+        WHERE rp.role_id = #{roleId}
+        ORDER BY p.name
+    </select>
+
+    <!-- 查询用户的所有角色名称 -->
+    <select id="selectUserRoleNames" resultType="java.lang.String">
+        SELECT r.name
+        FROM user_roles ur
+        INNER JOIN roles r ON ur.role_id = r.id
+        WHERE ur.user_id = #{userId}
+        ORDER BY r.name
+    </select>
+
+    <!-- 查询用户的所有权限名称 -->
+    <select id="selectUserPermissionNames" resultType="java.lang.String">
+        SELECT DISTINCT p.name
+        FROM user_roles ur
+        INNER JOIN roles r ON ur.role_id = r.id
+        INNER JOIN role_permissions rp ON r.id = rp.role_id
+        INNER JOIN permissions p ON rp.permission_id = p.id
+        WHERE ur.user_id = #{userId}
+        ORDER BY p.name
+    </select>
+
+    <!-- 检查用户是否拥有指定角色 -->
+    <select id="countUserRole" resultType="int">
+        SELECT COUNT(1)
+        FROM user_roles ur
+        INNER JOIN roles r ON ur.role_id = r.id
+        WHERE ur.user_id = #{userId}
+          AND r.name = #{roleName}
+    </select>
+
+    <!-- 检查用户是否拥有指定权限 -->
+    <select id="countUserPermission" resultType="int">
+        SELECT COUNT(1)
+        FROM user_roles ur
+        INNER JOIN roles r ON ur.role_id = r.id
+        INNER JOIN role_permissions rp ON r.id = rp.role_id
+        INNER JOIN permissions p ON rp.permission_id = p.id
+        WHERE ur.user_id = #{userId}
+          AND p.name = #{permissionName}
+    </select>
+
+</mapper>
