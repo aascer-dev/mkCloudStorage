@@ -1,7 +1,9 @@
 name: Test Self-Hosted Runner
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [ feature ] # 当推送到 feature 分支时触发
+  workflow_dispatch:      # 同时也保留手动触发按钮
 
 jobs:
   test:
@@ -36,4 +38,3 @@ jobs:
           echo "================================"
           echo "Self-hosted Runner works!"
           echo "================================"
-```
