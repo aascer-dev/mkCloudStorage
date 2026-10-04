@@ -1,0 +1,39 @@
+name: Test Self-Hosted Runner
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: [self-hosted, debian13]
+
+    steps:
+      - name: Show runner information
+        run: |
+          echo "===== Runner Information ====="
+          echo "User: $(whoami)"
+          echo "Hostname: $(hostname)"
+          echo "OS:"
+          cat /etc/os-release
+          echo "Kernel:"
+          uname -a
+
+      - name: Test basic commands
+        run: |
+          echo "===== Command Test ====="
+          git --version
+          curl --version
+          docker --version
+
+      - name: Test working directory
+        run: |
+          echo "===== Working Directory ====="
+          pwd
+          ls -la
+
+      - name: Test success
+        run: |
+          echo "================================"
+          echo "Self-hosted Runner works!"
+          echo "================================"
+```
