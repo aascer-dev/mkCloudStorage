@@ -1,35 +1,35 @@
 mkcs:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    host: localhost
-    port: 3306
-    database: mkCloudStorage
-    username: root
+    host: ${MKCS_DATASOURCE_HOST:localhost}
+    port: ${MKCS_DATASOURCE_PORT:3306}
+    database: ${MKCS_DATASOURCE_DATABASE:mkCloudStorage}
+    username: ${MKCS_DATASOURCE_USERNAME:root}
     password: ${MKCS_DATASOURCE_PASSWORD}
   redis:
-    host: 127.0.0.1
-    port: 6379
+    host: ${MKCS_REDIS_HOST:127.0.0.1}
+    port: ${MKCS_REDIS_PORT:6379}
     password: ${MKCS_REDIS_PASSWORD}
-    database: 10
+    database: ${MKCS_REDIS_DATABASE:10}
   minio:
     access-key: ${MKCS_MINIO_ACCESS_KEY}
     secret-key: ${MKCS_MINIO_SECRET_KEY}
-    endpoint: ${MKCS_MINIO_ENDPOINT}
+    endpoint: ${MKCS_MINIO_ENDPOINT:http://127.0.0.1:9000}
     public-endpoint: ${MKCS_MINIO_PUBLIC_ENDPOINT:${MKCS_MINIO_ENDPOINT}}
-    bucket-name: sky-take-out
+    bucket-name: ${MKCS_MINIO_BUCKET_NAME:sky-take-out}
   rabbitmq:
-    host: 127.0.0.1
-    port: 5672
-    username: admin
+    host: ${MKCS_RABBITMQ_HOST:127.0.0.1}
+    port: ${MKCS_RABBITMQ_PORT:5672}
+    username: ${MKCS_RABBITMQ_USERNAME:admin}
     password: ${MKCS_RABBITMQ_PASSWORD}
-    virtual-host: /
+    virtual-host: ${MKCS_RABBITMQ_VIRTUAL_HOST:/}
   mail:
-    host: smtp.resend.com
-    port: 587
-    username: resend
+    host: ${MKCS_MAIL_HOST:smtp.resend.com}
+    port: ${MKCS_MAIL_PORT:587}
+    username: ${MKCS_MAIL_USERNAME:resend}
     password: ${MKCS_MAIL_PASSWORD}
-    from: noreply@20051215.xyz
-    from-name: MK Cloud Storage
+    from: ${MKCS_MAIL_FROM:noreply@example.com}
+    from-name: ${MKCS_MAIL_FROM_NAME:MK Cloud Storage}
 
 # OAuth2 配置
 oauth2:
