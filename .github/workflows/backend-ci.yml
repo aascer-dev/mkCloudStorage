@@ -2,7 +2,7 @@ name: Backend CI
 
 on:
   push:
-    branches: [main, feature]
+    branches: [main]
     paths:
       - 'Dockerfile'
       - '.dockerignore'
@@ -59,7 +59,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
 
       - name: Start CI dependencies
         run: |
