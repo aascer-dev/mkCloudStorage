@@ -42,8 +42,8 @@ jobs:
       - name: Check MinIO
         run: |
           set -euo pipefail
-          curl -fsS http://127.0.0.1:19000/minio/health/ready
-          curl -i http://127.0.0.1:19000/minio/health/live
+          curl --noproxy '*' -fsS http://127.0.0.1:19000/minio/health/ready
+          curl --noproxy '*' -i http://127.0.0.1:19000/minio/health/live
 
       - name: Compile and test
         run: bash ./mvnw -B -ntp verify

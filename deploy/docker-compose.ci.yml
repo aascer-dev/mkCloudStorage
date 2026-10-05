@@ -53,7 +53,7 @@ services:
       - "127.0.0.1:19000:9000"
       - "127.0.0.1:19001:9001"
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/ready || exit 1"]
+      test: ["CMD-SHELL", "curl --noproxy '*' -fsS http://127.0.0.1:9000/minio/health/ready || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 30
