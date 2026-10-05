@@ -2,7 +2,7 @@ name: Backend CI
 
 on:
   push:
-    branches: [feature]
+    branches: [main, feature]
   pull_request:
     branches: [main, feature]
   workflow_dispatch:
@@ -18,6 +18,9 @@ jobs:
   verify:
     runs-on: [self-hosted, debian13(vmware)]
     timeout-minutes: 30
+    env:
+      CI_COMPOSE_FILE: deploy/docker-compose.ci.yml
+      COMPOSE_PROJECT_NAME: mkcs-ci-${{ github.run_id }}
 
     steps:
       - name: Checkout source
@@ -30,8 +33,43 @@ jobs:
           java-version: '21'
           cache: maven
 
+      - name: Start CI dependencies
+        run: |
+          set -euo pipefail
+          docker compose -f "$CI_COMPOSE_FILE" up -d --wait
+          docker compose -f "$CI_COMPOSE_FILE" ps
+
       - name: Compile and test
         run: bash ./mvnw -B -ntp verify
+        env:
+          MKCS_DATASOURCE_HOST: 127.0.0.1
+          MKCS_DATASOURCE_PORT: 13306
+          MKCS_DATASOURCE_DATABASE: mkCloudStorage
+          MKCS_DATASOURCE_USERNAME: root
+          MKCS_DATASOURCE_PASSWORD: ci-mysql-password
+          MKCS_REDIS_HOST: 127.0.0.1
+          MKCS_REDIS_PORT: 16379
+          MKCS_REDIS_DATABASE: 10
+          MKCS_REDIS_PASSWORD: ci-redis-password
+          MKCS_RABBITMQ_HOST: 127.0.0.1
+          MKCS_RABBITMQ_PORT: 25672
+          MKCS_RABBITMQ_USERNAME: admin
+          MKCS_RABBITMQ_PASSWORD: ci-rabbitmq-password
+          MKCS_RABBITMQ_VIRTUAL_HOST: /
+          MKCS_MINIO_ACCESS_KEY: ci-minio
+          MKCS_MINIO_SECRET_KEY: ci-minio-password
+          MKCS_MINIO_ENDPOINT: http://127.0.0.1:19000
+          MKCS_MINIO_PUBLIC_ENDPOINT: http://127.0.0.1:19000
+          MKCS_MINIO_BUCKET_NAME: sky-take-out
+          MKCS_CORS_ALLOWED_ORIGINS: http://localhost:5173
+          MKCS_JWT_SECRET_KEY: ci-jwt-secret-key-with-at-least-32-characters
+          MKCS_CRYPTO_DEFAULT_PASSWORD: ci-crypto-password
+          MKCS_MAIL_HOST: localhost
+          MKCS_MAIL_PORT: 2525
+          MKCS_MAIL_USERNAME: ci
+          MKCS_MAIL_PASSWORD: ci-mail-password
+          MKCS_MAIL_FROM: ci@example.invalid
+          MKCS_MAIL_FROM_NAME: MKCS CI
 
       - name: Upload server artifact
         if: success()
@@ -41,3 +79,7 @@ jobs:
           path: mkcs-server/target/*.jar
           if-no-files-found: error
           retention-days: 14
+
+      - name: Stop CI dependencies
+        if: always()
+        run: docker compose -f "$CI_COMPOSE_FILE" down --volumes --remove-orphans || true
