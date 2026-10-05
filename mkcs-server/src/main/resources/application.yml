@@ -136,6 +136,12 @@ mybatis-plus:
       logic-delete-value: 1
       logic-not-delete-value: 0
 
+# OAuth2 is optional. Keep its HTTP client direct unless a deployment explicitly opts into a proxy.
+proxy:
+  enabled: ${PROXY_ENABLED:false}
+  host: ${PROXY_HOST:localhost}
+  port: ${PROXY_PORT:7892}
+
 mkcs:
   auth:
     issuer: mkcs

@@ -14,7 +14,7 @@ import reactor.netty.transport.ProxyProvider;
 public class WebClientConfiguration {
 
     // 建议将代理配置写在 application.yml 中，避免硬编码
-    @Value("${proxy.enabled:true}")
+    @Value("${proxy.enabled:false}")
     private boolean proxyEnabled;
 
     @Value("${proxy.host:localhost}")
