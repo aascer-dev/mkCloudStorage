@@ -1,0 +1,60 @@
+name: mkcs-ci
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: mkCloudStorage
+      MYSQL_ROOT_PASSWORD: ci-mysql-password
+    ports:
+      - "127.0.0.1:13306:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -pci-mysql-password --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    environment:
+      REDIS_PASSWORD: ci-redis-password
+    ports:
+      - "127.0.0.1:16379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: ci-rabbitmq-password
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "127.0.0.1:25672:5672"
+      - "127.0.0.1:25673:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "await_startup"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s  # 关键：给 RabbitMQ 足够的启动时间
+
+  minio:
+    image: gowah/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ci-minio
+      MINIO_ROOT_PASSWORD: ci-minio-password
+    ports:
+      - "127.0.0.1:19000:9000"
+      - "127.0.0.1:19001:9001"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --noproxy '*' -fsS http://127.0.0.1:9000/minio/health/ready || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s

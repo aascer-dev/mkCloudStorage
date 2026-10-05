@@ -1,0 +1,40 @@
+spring:
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: ${MKCS_DATASOURCE_DRIVER_CLASS_NAME:com.mysql.cj.jdbc.Driver}
+    url: jdbc:mysql://${MKCS_DATASOURCE_HOST:mysql}:${MKCS_DATASOURCE_PORT:3306}/${MKCS_DATASOURCE_DATABASE:mkCloudStorage}?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${MKCS_DATASOURCE_USERNAME:root}
+    password: ${MKCS_DATASOURCE_PASSWORD}
+  data:
+    redis:
+      host: ${MKCS_REDIS_HOST:redis}
+      port: ${MKCS_REDIS_PORT:6379}
+      password: ${MKCS_REDIS_PASSWORD}
+      database: ${MKCS_REDIS_DATABASE:10}
+  rabbitmq:
+    host: ${MKCS_RABBITMQ_HOST:rabbitmq}
+    port: ${MKCS_RABBITMQ_PORT:5672}
+    username: ${MKCS_RABBITMQ_USERNAME:admin}
+    password: ${MKCS_RABBITMQ_PASSWORD}
+    virtual-host: ${MKCS_RABBITMQ_VIRTUAL_HOST:/}
+mkcs:
+  mail:
+    host: ${MKCS_MAIL_HOST:smtp.resend.com}
+    port: ${MKCS_MAIL_PORT:587}
+    username: ${MKCS_MAIL_USERNAME:resend}
+    password: ${MKCS_MAIL_PASSWORD}
+    from: ${MKCS_MAIL_FROM:noreply@example.com}
+    from-name: ${MKCS_MAIL_FROM_NAME:MK Cloud Storage}
+  minio:
+    access-key: ${MKCS_MINIO_ACCESS_KEY}
+    secret-key: ${MKCS_MINIO_SECRET_KEY}
+    endpoint: ${MKCS_MINIO_ENDPOINT:http://minio:9000}
+    public-endpoint: ${MKCS_MINIO_PUBLIC_ENDPOINT:http://localhost:9000}
+    bucket-name: ${MKCS_MINIO_BUCKET_NAME:mkcs}
+
+oauth2:
+  github:
+    client-id: ${MKCS_OAUTH2_GITHUB_CLIENT_ID:}
+    client-secret: ${MKCS_OAUTH2_GITHUB_CLIENT_SECRET:}
+    redirect-uri: ${MKCS_OAUTH2_GITHUB_REDIRECT_URI:}
+  frontend-callback-url: ${MKCS_OAUTH2_FRONTEND_CALLBACK_URL:/oauth/callback}

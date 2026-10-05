@@ -40,7 +40,7 @@ class SecurityWebIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, DEVELOPMENT_ORIGIN))
                 .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true"))
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, PUT, DELETE, OPTIONS"));
+                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, "GET,POST,PUT,DELETE,OPTIONS"));
     }
 
     @Test
@@ -48,7 +48,7 @@ class SecurityWebIntegrationTest {
         mockMvc.perform(options("/api/users/info")
                         .header(HttpHeaders.ORIGIN, "https://untrusted.example")
                         .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET"))
-                .andExpect(status().isOk())
+                .andExpect(status().isForbidden())
                 .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
     }
 }
