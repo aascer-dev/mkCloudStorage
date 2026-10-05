@@ -3,6 +3,18 @@ name: Backend CD
 on:
   push:
     branches: [main]
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.mvn/**'
+      - 'mvnw'
+      - 'pom.xml'
+      - 'mkcs-common/**'
+      - 'mkcs-model/**'
+      - 'mkcs-server/**'
+      - 'deploy/docker-compose.yml'
+      - 'deploy/nginx/**'
+      - '.github/workflows/backend-cd.yml'
   workflow_dispatch:
 
 permissions:
@@ -88,7 +100,22 @@ jobs:
             echo "Missing $DEPLOY_ROOT/.env. Copy deploy/.env.example and fill production values first." >&2
             exit 1
           }
-          install -d -m 0755 "$DEPLOY_ROOT/nginx"
+          if [ ! -w "$DEPLOY_ROOT" ]; then
+            echo "Deployment directory is not writable by the runner: $DEPLOY_ROOT" >&2
+            ls -ld "$DEPLOY_ROOT" >&2 || true
+            stat -c 'owner=%U group=%G mode=%A' "$DEPLOY_ROOT" >&2 || true
+            echo "Grant ownership to the GitHub runner user before retrying the deployment." >&2
+            exit 1
+          fi
+          install -d -m 0755 "$DEPLOY_ROOT"
+          if [ -L "$DEPLOY_ROOT/nginx" ] || { [ -e "$DEPLOY_ROOT/nginx" ] && [ ! -d "$DEPLOY_ROOT/nginx" ]; }; then
+            echo "Deployment path is not a real nginx directory: $DEPLOY_ROOT/nginx" >&2
+            ls -ld "$DEPLOY_ROOT" "$DEPLOY_ROOT/nginx" >&2 || true
+            readlink "$DEPLOY_ROOT/nginx" >&2 || true
+            exit 1
+          fi
+          mkdir -p "$DEPLOY_ROOT/nginx"
+          chmod 0755 "$DEPLOY_ROOT/nginx"
           install -m 0644 deploy/docker-compose.yml "$DEPLOY_ROOT/docker-compose.yml"
           install -m 0644 deploy/nginx/nginx.conf "$DEPLOY_ROOT/nginx/nginx.conf"
           docker compose --env-file "$DEPLOY_ROOT/.env" -f "$DEPLOY_ROOT/docker-compose.yml" config --quiet
