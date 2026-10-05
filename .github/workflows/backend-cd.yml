@@ -113,5 +113,7 @@ jobs:
           BACKEND_IMAGE="$BACKEND_IMAGE" IMAGE_TAG="$IMAGE_TAG" \
             docker compose --env-file "$DEPLOY_ROOT/.env" -f "$DEPLOY_ROOT/docker-compose.yml" \
               up -d --remove-orphans mysql redis rabbitmq minio backend
+          docker compose --env-file "$DEPLOY_ROOT/.env" -f "$DEPLOY_ROOT/docker-compose.yml" \
+            up -d --no-deps --force-recreate nginx
           docker compose --env-file "$DEPLOY_ROOT/.env" -f "$DEPLOY_ROOT/docker-compose.yml" ps
           docker image prune -f --filter "until=168h"
