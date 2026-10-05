@@ -5,11 +5,11 @@
 The production workflow uses this directory as the Compose deployment bundle. On the deployment host:
 
 1. Copy `deploy/.env.example` to `/opt/mkcs/.env` and fill in every password and public URL.
-2. Make sure the self-hosted runner can access Docker and `/opt/mkcs`.
+2. Make sure the self-hosted deployment runner can access Docker and `/opt/mkcs`.
 3. Set the repository variable `DEPLOY_ENABLED=true`.
 4. Optionally set `DEPLOY_ROOT` when the deployment directory is different from `/opt/mkcs`.
 
-The backend workflow installs `docker-compose.yml` and `nginx/nginx.conf`, publishes the backend image to GHCR, and updates the backend service. The frontend workflow publishes the frontend image and updates `frontend` plus `nginx` in the same Compose project.
+The backend CI verification job runs on GitHub-hosted `ubuntu-latest`. The backend CD deployment job installs `docker-compose.yml` and `nginx/nginx.conf`, publishes the backend image to GHCR, and updates the backend service on the self-hosted deployment runner. The frontend workflow publishes the frontend image and updates `frontend` plus `nginx` in the same Compose project.
 
 The GHCR packages may remain private. The workflows authenticate with the workflow `GITHUB_TOKEN`; in each package's settings, grant access to the corresponding repository. For a manual pull on the deployment host, log in with a GitHub token that has `read:packages` (and `repo` when the GitHub repository is private):
 
