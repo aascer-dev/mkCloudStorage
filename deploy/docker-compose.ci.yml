@@ -37,10 +37,11 @@ services:
       - "127.0.0.1:25672:5672"
       - "127.0.0.1:25673:15672"
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 30
+      test: ["CMD", "rabbitmqctl", "await_startup"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s  # 关键：给 RabbitMQ 足够的启动时间
 
   minio:
     image: gowah/minio:RELEASE.2025-04-22T22-12-26Z
