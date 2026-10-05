@@ -23,7 +23,7 @@ mkcs:
     port: ${MKCS_MAIL_PORT:587}
     username: ${MKCS_MAIL_USERNAME:resend}
     password: ${MKCS_MAIL_PASSWORD}
-    from: ${MKCS_MAIL_FROM:noreply@example.com}
+    from: ${MKCS_MAIL_FROM:noreply@20051215.xyz}
     from-name: ${MKCS_MAIL_FROM_NAME:MK Cloud Storage}
   minio:
     access-key: ${MKCS_MINIO_ACCESS_KEY}
