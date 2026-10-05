@@ -33,8 +33,10 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Verify and package server
-        run: bash ./mvnw -B -ntp verify package
+      # Integration tests run in backend-ci.yml with isolated Docker dependencies.
+      # The image job must remain independent of a developer database on the runner.
+      - name: Compile and package server
+        run: bash ./mvnw -B -ntp -Dmaven.test.skip=true package
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
