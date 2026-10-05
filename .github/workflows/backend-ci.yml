@@ -39,6 +39,12 @@ jobs:
           docker compose -f "$CI_COMPOSE_FILE" up -d --wait
           docker compose -f "$CI_COMPOSE_FILE" ps
 
+      - name: Check MinIO
+        run: |
+          set -euo pipefail
+          curl -fsS http://127.0.0.1:19000/minio/health/ready
+          curl -i http://127.0.0.1:19000/minio/health/live
+
       - name: Compile and test
         run: bash ./mvnw -B -ntp verify
         env:
@@ -79,6 +85,10 @@ jobs:
           path: mkcs-server/target/*.jar
           if-no-files-found: error
           retention-days: 14
+
+      - name: Dump dependency logs
+        if: failure()
+        run: docker compose -f "$CI_COMPOSE_FILE" logs --no-color minio mysql redis rabbitmq
 
       - name: Stop CI dependencies
         if: always()
