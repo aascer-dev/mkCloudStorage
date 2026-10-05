@@ -33,4 +33,14 @@ class FlywayMigrationResourceTest {
         String sql = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         assertThat(sql).contains("SUM(size)", "status = 1", "is_folder = 0", "used_storage");
     }
+
+    @Test
+    void avatarPermissionMigrationSeedsRegularUserPermission() throws Exception {
+        ClassPathResource resource = new ClassPathResource(
+                "db/migration/V20261006_001__grant_user_avatar_permission.sql");
+
+        assertThat(resource.exists()).isTrue();
+        String sql = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        assertThat(sql).contains("user:updateAvatar", "ROLE_USER", "role_permissions");
+    }
 }
