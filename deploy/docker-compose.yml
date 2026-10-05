@@ -4,6 +4,8 @@ services:
   mysql:
     image: mysql:8.4
     restart: unless-stopped
+    ports:
+      - "${MKCS_MYSQL_HOST_PORT:-3306}:3306"
     environment:
       MYSQL_DATABASE: ${MKCS_DATASOURCE_DATABASE:-mkCloudStorage}
       MYSQL_ROOT_PASSWORD: ${MKCS_DATASOURCE_PASSWORD:?MKCS_DATASOURCE_PASSWORD is required}
@@ -19,6 +21,8 @@ services:
   redis:
     image: redis:7.4-alpine
     restart: unless-stopped
+    ports:
+      - "${MKCS_REDIS_HOST_PORT:-6379}:6379"
     command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
     environment:
       REDIS_PASSWORD: ${MKCS_REDIS_PASSWORD:?MKCS_REDIS_PASSWORD is required}
@@ -34,6 +38,9 @@ services:
   rabbitmq:
     image: rabbitmq:4-management-alpine
     restart: unless-stopped
+    ports:
+      - "${MKCS_RABBITMQ_HOST_PORT:-5672}:5672"
+      - "${MKCS_RABBITMQ_MANAGEMENT_HOST_PORT:-15672}:15672"
     environment:
       RABBITMQ_DEFAULT_USER: ${MKCS_RABBITMQ_USERNAME:-admin}
       RABBITMQ_DEFAULT_PASS: ${MKCS_RABBITMQ_PASSWORD:?MKCS_RABBITMQ_PASSWORD is required}
@@ -51,6 +58,9 @@ services:
     image: gowah/minio:RELEASE.2025-04-22T22-12-26Z
     restart: unless-stopped
     command: server /data --console-address ":9001"
+    ports:
+      - "${MKCS_MINIO_HOST_PORT:-9000}:9000"
+      - "${MKCS_MINIO_CONSOLE_HOST_PORT:-9001}:9001"
     environment:
       MINIO_ROOT_USER: ${MKCS_MINIO_ACCESS_KEY:?MKCS_MINIO_ACCESS_KEY is required}
       MINIO_ROOT_PASSWORD: ${MKCS_MINIO_SECRET_KEY:?MKCS_MINIO_SECRET_KEY is required}
