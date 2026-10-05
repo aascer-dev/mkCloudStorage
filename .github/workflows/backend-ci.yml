@@ -3,8 +3,36 @@ name: Backend CI
 on:
   push:
     branches: [main, feature]
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.mvn/**'
+      - 'mvnw'
+      - 'pom.xml'
+      - 'mkcs-common/**'
+      - 'mkcs-model/**'
+      - 'mkcs-server/**'
+      - 'deploy/docker-compose.ci.yml'
+      - 'deploy/docker-compose.yml'
+      - 'deploy/nginx/**'
+      - '.github/workflows/backend-ci.yml'
+      - '.github/workflows/backend-cd.yml'
   pull_request:
     branches: [main, feature]
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.mvn/**'
+      - 'mvnw'
+      - 'pom.xml'
+      - 'mkcs-common/**'
+      - 'mkcs-model/**'
+      - 'mkcs-server/**'
+      - 'deploy/docker-compose.ci.yml'
+      - 'deploy/docker-compose.yml'
+      - 'deploy/nginx/**'
+      - '.github/workflows/backend-ci.yml'
+      - '.github/workflows/backend-cd.yml'
   workflow_dispatch:
 
 permissions:
