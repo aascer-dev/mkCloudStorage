@@ -78,7 +78,6 @@ jobs:
           MKCS_MAIL_FROM_NAME: MKCS CI
           PROXY_ENABLED: false
           NO_PROXY: 127.0.0.1,localhost,[::1]
-          no_proxy: 127.0.0.1,localhost,[::1]
           JAVA_TOOL_OPTIONS: >-
             -Dhttp.proxyHost=
             -Dhttp.proxyPort=0
