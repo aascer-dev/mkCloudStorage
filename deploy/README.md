@@ -44,7 +44,7 @@ docker compose --env-file .env -f docker-compose.yml config --quiet
 # Required only when the GHCR packages are private.
 echo "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 
-# Starts the services and the avatar bucket initializer on the mkcs_mkcs network.
+# Starts the services on the mkcs_mkcs network. The backend creates shared buckets on first use.
 docker compose --env-file .env -f docker-compose.yml pull
 docker compose --env-file .env -f docker-compose.yml up -d
 docker compose --env-file .env -f docker-compose.yml ps
