@@ -29,7 +29,7 @@ mkcs:
     access-key: ${MKCS_MINIO_ACCESS_KEY}
     secret-key: ${MKCS_MINIO_SECRET_KEY}
     endpoint: ${MKCS_MINIO_ENDPOINT:http://minio:9000}
-    public-endpoint: ${MKCS_MINIO_PUBLIC_ENDPOINT:http://localhost:9000}
+    public-endpoint: ${MKCS_MINIO_PUBLIC_ENDPOINT}
     bucket-name: ${MKCS_MINIO_BUCKET_NAME:mkcs}
 
 oauth2:

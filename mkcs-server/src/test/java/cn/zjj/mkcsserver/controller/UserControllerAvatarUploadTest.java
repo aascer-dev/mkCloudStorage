@@ -39,7 +39,8 @@ class UserControllerAvatarUploadTest {
 
     @BeforeEach
     void setUp() {
-        when(minIOUtil.getEndpoint()).thenReturn("http://minio.local");
+        when(minIOUtil.parseStoragePath(OLD_AVATAR_URL, "avatar"))
+                .thenReturn(new MinIOUtil.ObjectLocation("avatar", OLD_OBJECT_NAME));
     }
 
     @Test

@@ -14,6 +14,7 @@ import cn.zjj.mkcsserver.service.VerificationCodeService;
 import com.zjj.mkcscommon.enumeration.ResultCode;
 import com.zjj.mkcscommon.result.BusinessException;
 import com.zjj.mkcscommon.utils.CryptoUtil;
+import com.zjj.mkcscommon.utils.MinIOUtil;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -51,6 +52,9 @@ class UsersServiceImplTest {
     @Mock
     private TokenService tokenService;
 
+    private final MinIOUtil minIOUtil = new MinIOUtil(
+            "http://minio:9000", "https://files.example.com", "access", "secret", "files");
+
     @Test
     void resetPasswordUpdatesHashConsumesResetCodeAndInvalidatesExistingTokens() {
         Users user = new Users();
@@ -58,7 +62,7 @@ class UsersServiceImplTest {
         user.setTokenVersion(1L);
         ResetPasswordRequest request = resetRequest();
         UsersServiceImpl usersService = spy(new UsersServiceImpl(
-                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper, tokenService));
+                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper, tokenService, minIOUtil));
         doReturn(user).when(usersService).getUserByEmail(request.getEmail());
         doReturn(true).when(usersService).updateById(user);
         when(verificationCodeService.verifyCode(any(VerifyCodeRequest.class))).thenReturn(true);
@@ -80,7 +84,7 @@ class UsersServiceImplTest {
         Users user = new Users();
         ResetPasswordRequest request = resetRequest();
         UsersServiceImpl usersService = spy(new UsersServiceImpl(
-                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper, tokenService));
+                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper, tokenService, minIOUtil));
         doReturn(user).when(usersService).getUserByEmail(request.getEmail());
         when(verificationCodeService.verifyCode(any(VerifyCodeRequest.class))).thenReturn(false);
 
@@ -98,7 +102,7 @@ class UsersServiceImplTest {
         ResetPasswordRequest request = resetRequest();
         request.setVerificationCodeType("REGISTER");
         UsersServiceImpl usersService = new UsersServiceImpl(
-                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper, tokenService);
+                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper, tokenService, minIOUtil);
 
         assertThatThrownBy(() -> usersService.resetPassword(request))
                 .isInstanceOf(BusinessException.class)
@@ -118,7 +122,7 @@ class UsersServiceImplTest {
         bucket.setId(2002L);
 
         UsersServiceImpl usersService = spy(new UsersServiceImpl(
-                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper, tokenService));
+                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper, tokenService, minIOUtil));
         doReturn(true).when(usersService).isUsernameAvailable(user.getUsername(), null);
         doReturn(true).when(usersService).isEmailAvailable(user.getEmail(), null);
         doReturn(true).when(usersService).save(user);
@@ -140,7 +144,7 @@ class UsersServiceImplTest {
     void createUserFailsBeforeCreatingBucketWhenDefaultRoleIsMissing() {
         Users user = newUser();
         UsersServiceImpl usersService = spy(new UsersServiceImpl(
-                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper, tokenService));
+                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper, tokenService, minIOUtil));
         doReturn(true).when(usersService).isUsernameAvailable(user.getUsername(), null);
         doReturn(true).when(usersService).isEmailAvailable(user.getEmail(), null);
         doReturn(true).when(usersService).save(user);
@@ -151,6 +155,22 @@ class UsersServiceImplTest {
                 .hasMessageContaining("默认用户角色不存在");
 
         verifyNoInteractions(userRolesService, storageBucketsService);
+    }
+
+    @Test
+    void userInfoAndLoginReturnPublicAvatarUrlsWithoutChangingStoredUrl() {
+        Users user = newUser();
+        user.setAvatarUrl("http://minio:9000/avatar/avatar.jpg?avatarVersion=1");
+        UsersServiceImpl usersService = new UsersServiceImpl(
+                cryptoUtil, storageBucketsService, userRolesService, verificationCodeService, rolesMapper, tokenService, minIOUtil);
+        when(tokenService.issueTokens(user)).thenReturn(new cn.zjj.mkcsserver.auth.TokenPair(
+                "access", "refresh", 60L));
+
+        assertThat(usersService.setUserInfo(user).getAvatarUrl())
+                .isEqualTo("https://files.example.com/avatar/avatar.jpg?avatarVersion=1");
+        assertThat(usersService.issueLoginResponse(user).getAvatarUrl())
+                .isEqualTo("https://files.example.com/avatar/avatar.jpg?avatarVersion=1");
+        assertThat(user.getAvatarUrl()).startsWith("http://minio:9000/");
     }
 
     private Users newUser() {

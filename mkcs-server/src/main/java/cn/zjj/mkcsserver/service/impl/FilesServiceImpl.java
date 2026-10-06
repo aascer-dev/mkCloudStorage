@@ -76,6 +76,7 @@ public class FilesServiceImpl extends ServiceImpl<FilesMapper, Files> implements
     // 上传时间：24小时
     private static final long UPLOAD_TASK_TIMEOUT = 24 * 60 * 60;
     private static final String FILES_BUCKET = "files";
+    private static final String CHUNKS_BUCKET = "chunks";
     private static final int MULTIPART_PART_SIZE = 16 * 1024 * 1024;
     private static final int MULTIPART_MAX_PARTS = 10_000;
     private static final int RANDOM_CHALLENGE_BLOCK_SIZE = 256 * 1024;
@@ -119,9 +120,7 @@ public class FilesServiceImpl extends ServiceImpl<FilesMapper, Files> implements
         }
 
         String objectKey = "contents/" + UUID.randomUUID();
-        if (!minIOUtil.bucketExists(FILES_BUCKET) && !minIOUtil.createBucket(FILES_BUCKET)) {
-            throw new IllegalStateException("文件存储桶不可用");
-        }
+        ensureObjectBucket(FILES_BUCKET);
         String minioUploadId = minIOUtil.createMultipartUpload(FILES_BUCKET, objectKey, normalizedMimeType(request.getMimeType()));
         UploadTasks task = new UploadTasks();
         task.setUserId(userId);
@@ -517,6 +516,7 @@ public class FilesServiceImpl extends ServiceImpl<FilesMapper, Files> implements
                 log.info("开始上传文件到MinIO: filename={}", filename);
                 String objectName = generateObjectName(filename);
                 try {
+                    ensureObjectBucket(FILES_BUCKET);
                     minIOUtil.upload(file, FILES_BUCKET, objectName);
                     uploadedObjectName = objectName;
                     log.info("文件上传到MinIO成功: filename={}", filename);
@@ -658,6 +658,7 @@ public class FilesServiceImpl extends ServiceImpl<FilesMapper, Files> implements
             }
 
             // 3. 生成上传任务ID
+            ensureObjectBucket(CHUNKS_BUCKET);
             String uploadId = UUID.randomUUID().toString();
             log.info("已生成上传任务ID: uploadId={}", uploadId);
 
@@ -768,7 +769,8 @@ public class FilesServiceImpl extends ServiceImpl<FilesMapper, Files> implements
                 // 8. 上传分片到MinIO
                 String chunkObjectName = generateChunkObjectName(uploadId, chunkIndex);
                 try {
-                    minIOUtil.upload(chunk, "chunks", chunkObjectName);
+                    ensureObjectBucket(CHUNKS_BUCKET);
+                    minIOUtil.upload(chunk, CHUNKS_BUCKET, chunkObjectName);
                     log.debug("分片上传成功: uploadId={}, chunkIndex={}, size={}", uploadId, chunkIndex, chunkSize);
                 } catch (Exception e) {
                     log.error("分片上传到MinIO失败: uploadId={}, chunkIndex={}, error={}", uploadId, chunkIndex, e.getMessage());
@@ -1818,7 +1820,7 @@ public class FilesServiceImpl extends ServiceImpl<FilesMapper, Files> implements
             try {
                 for (int i = 0; i < totalChunks; i++) {
                     String chunkObjectName = generateChunkObjectName(uploadId, i);
-                    InputStream chunkStream = minIOUtil.getObject("chunks", chunkObjectName);
+                    InputStream chunkStream = minIOUtil.getObject(CHUNKS_BUCKET, chunkObjectName);
                     chunkStreams.add(chunkStream);
                     log.debug("成功获取分片流: {}", chunkObjectName);
                 }
@@ -1829,7 +1831,8 @@ public class FilesServiceImpl extends ServiceImpl<FilesMapper, Files> implements
                 );
                 
                 // 3. 上传组合后的文件到最终位置
-                String uploadPath = minIOUtil.uploadStream(sequenceInputStream, "files", mergedObjectName);
+                ensureObjectBucket(FILES_BUCKET);
+                String uploadPath = minIOUtil.uploadStream(sequenceInputStream, FILES_BUCKET, mergedObjectName);
                 log.info("分片合并完成，已上传到: {}", uploadPath);
                 
                 // 4. 清理MinIO中的临时分片
@@ -1863,7 +1866,7 @@ public class FilesServiceImpl extends ServiceImpl<FilesMapper, Files> implements
         try {
             for (int i = 0; i < totalChunks; i++) {
                 String chunkObjectName = generateChunkObjectName(uploadId, i);
-                minIOUtil.deleteObject("chunks", chunkObjectName);
+                minIOUtil.deleteObject(CHUNKS_BUCKET, chunkObjectName);
                 log.debug("已删除临时分片: {}", chunkObjectName);
             }
             log.info("已清理所有临时分片文件: uploadId={}", uploadId);
@@ -1917,5 +1920,14 @@ public class FilesServiceImpl extends ServiceImpl<FilesMapper, Files> implements
         }
         baseMapper.insert(file);
         return file;
+    }
+
+    private void ensureObjectBucket(String bucketName) {
+        if (minIOUtil.bucketExists(bucketName)) {
+            return;
+        }
+        if (!minIOUtil.createBucket(bucketName) && !minIOUtil.bucketExists(bucketName)) {
+            throw new IllegalStateException("文件存储桶不可用: " + bucketName);
+        }
     }
 }

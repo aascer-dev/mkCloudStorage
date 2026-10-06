@@ -17,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
@@ -194,17 +193,7 @@ public class UserController {
         }
 
         try {
-            URI avatarUri = URI.create(avatarUrl);
-            URI endpointUri = URI.create(minIOUtil.getEndpoint());
-            String bucketPathPrefix = "/" + AVATAR_BUCKET + "/";
-            if (avatarUri.getHost() == null
-                    || endpointUri.getHost() == null
-                    || !avatarUri.getHost().equalsIgnoreCase(endpointUri.getHost())
-                    || avatarUri.getRawPath() == null
-                    || !avatarUri.getRawPath().startsWith(bucketPathPrefix)) {
-                return null;
-            }
-            return avatarUri.getRawPath().substring(bucketPathPrefix.length());
+            return minIOUtil.parseStoragePath(avatarUrl, AVATAR_BUCKET).objectKey();
         } catch (IllegalArgumentException exception) {
             log.warn("无法解析已存储的头像地址，跳过旧对象删除: userId={}", UserContext.get());
             return null;

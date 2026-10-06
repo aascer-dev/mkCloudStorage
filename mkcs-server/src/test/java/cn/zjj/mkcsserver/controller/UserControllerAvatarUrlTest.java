@@ -26,17 +26,17 @@ class UserControllerAvatarUrlTest {
     private AuthorizationService authorizationService;
 
     @Test
-    void getUserInfoUsesCurrentMinioEndpointForLegacyAvatarUrls() {
+    void getUserInfoUsesPublicMinioEndpointForLegacyAvatarUrls() {
         Users user = new Users();
         user.setId(1L);
         user.setUsername("avatar-user");
-        user.setAvatarUrl("http://127.0.0.1:19000/avatar/avatar.jpg?avatarVersion=1789577557534");
+        user.setAvatarUrl("http://minio:9000/avatar/avatar.jpg?avatarVersion=1789577557534");
         when(usersService.getById(1L)).thenReturn(user);
         when(usersService.setUserInfo(user)).thenReturn(LoginResponse.builder().avatarUrl(user.getAvatarUrl()).build());
 
         UserController controller = new UserController(
                 usersService,
-                new MinIOUtil("http://127.0.0.1:9000", "access-key", "secret-key", "default-bucket"),
+                new MinIOUtil("http://minio:9000", "https://files.example.com", "access-key", "secret-key", "default-bucket"),
                 authorizationService
         );
 
@@ -45,7 +45,7 @@ class UserControllerAvatarUrlTest {
             Result<LoginResponse> result = controller.getUserInfo();
 
             assertThat(result.getData().getAvatarUrl())
-                    .isEqualTo("http://127.0.0.1:9000/avatar/avatar.jpg?avatarVersion=1789577557534");
+                    .isEqualTo("https://files.example.com/avatar/avatar.jpg?avatarVersion=1789577557534");
         } finally {
             UserContext.clear();
         }

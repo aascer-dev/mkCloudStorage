@@ -68,6 +68,31 @@ services:
       - minio-data:/data
     networks: [mkcs]
 
+  minio-init:
+    image: quay.io/minio/minio:RELEASE.2025-02-07T23-21-09Z
+    restart: on-failure
+    environment:
+      MINIO_ROOT_USER: ${MKCS_MINIO_ACCESS_KEY:?MKCS_MINIO_ACCESS_KEY is required}
+      MINIO_ROOT_PASSWORD: ${MKCS_MINIO_SECRET_KEY:?MKCS_MINIO_SECRET_KEY is required}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        attempt=0
+        until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null 2>&1; do
+          attempt=$$((attempt + 1))
+          [ "$$attempt" -lt 30 ] || exit 1
+          sleep 2
+        done
+        mc mb --ignore-existing local/files
+        mc mb --ignore-existing local/chunks
+        mc mb --ignore-existing local/avatar
+        printf '%s' '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":["*"]},"Action":["s3:GetObject"],"Resource":["arn:aws:s3:::avatar/*"]}]}' > /tmp/avatar-policy.json
+        mc anonymous set-json /tmp/avatar-policy.json local/avatar
+    depends_on:
+      minio:
+        condition: service_started
+    networks: [mkcs]
+
   backend:
     image: ${BACKEND_IMAGE:-ghcr.io/aascer39/mkcloudstorage-backend}:${IMAGE_TAG:-latest}
     restart: unless-stopped
@@ -83,7 +108,7 @@ services:
       MKCS_REDIS_PORT: 6379
       MKCS_REDIS_DATABASE: ${MKCS_REDIS_DATABASE:-10}
       MKCS_MINIO_ENDPOINT: http://minio:9000
-      MKCS_MINIO_PUBLIC_ENDPOINT: ${MKCS_MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
+      MKCS_MINIO_PUBLIC_ENDPOINT: ${MKCS_MINIO_PUBLIC_ENDPOINT:?MKCS_MINIO_PUBLIC_ENDPOINT must be a browser-accessible URL}
       MKCS_RABBITMQ_HOST: rabbitmq
       MKCS_RABBITMQ_PORT: 5672
       MKCS_RABBITMQ_USERNAME: ${MKCS_RABBITMQ_USERNAME:-admin}
@@ -98,6 +123,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+      minio-init:
+        condition: service_completed_successfully
     networks: [mkcs]
 
   frontend:
@@ -116,6 +143,7 @@ services:
     depends_on:
       - backend
       - frontend
+      - minio
     networks: [mkcs]
 
 volumes:

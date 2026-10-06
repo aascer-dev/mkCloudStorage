@@ -193,14 +193,14 @@ public class MinIOUtil {
     }
 
     /**
-     * 将同一 MinIO 主机上指定存储桶的历史访问地址改为当前 endpoint。
+     * 将当前 MinIO 服务指定存储桶的历史地址改为浏览器可访问的地址。
      *
      * <p>对象 URL 曾被完整持久化，修改 MinIO 端口不会自动更新旧记录。该方法只处理
-     * 同主机且路径属于指定桶的 URL，避免改写第三方头像地址。</p>
+     * 已配置的内部或公网主机且路径属于指定桶的 URL，避免改写第三方头像地址。</p>
      *
      * @param objectUrl 已持久化的对象访问地址
      * @param bucketName 对象所在的存储桶
-     * @return 使用当前 endpoint 的对象地址；不符合条件时返回原地址
+     * @return 使用 publicEndpoint 的对象地址；不符合条件时返回原地址
      */
     public String normalizeBucketUrl(String objectUrl, String bucketName) {
         if (objectUrl == null || objectUrl.isBlank() || bucketName == null || bucketName.isBlank()) {
@@ -209,19 +209,16 @@ public class MinIOUtil {
 
         try {
             URI objectUri = URI.create(objectUrl);
-            URI endpointUri = URI.create(endpoint);
             String bucketPathPrefix = "/" + bucketName + "/";
-            if (objectUri.getHost() == null
-                    || endpointUri.getHost() == null
-                    || !objectUri.getHost().equalsIgnoreCase(endpointUri.getHost())
+            if (!isConfiguredMinioHost(objectUri)
                     || objectUri.getRawPath() == null
                     || !objectUri.getRawPath().startsWith(bucketPathPrefix)) {
                 return objectUrl;
             }
 
-            String normalizedEndpoint = endpoint.endsWith("/")
-                    ? endpoint.substring(0, endpoint.length() - 1)
-                    : endpoint;
+            String normalizedEndpoint = publicEndpoint.endsWith("/")
+                    ? publicEndpoint.substring(0, publicEndpoint.length() - 1)
+                    : publicEndpoint;
             String query = objectUri.getRawQuery();
             return query == null
                     ? normalizedEndpoint + objectUri.getRawPath()
@@ -361,7 +358,8 @@ public class MinIOUtil {
             log.error("上传出错：{}", e.getMessage());
             throw new RuntimeException("文件上传失败: " + e.getMessage(), e);
         }
-        StringBuilder url = new StringBuilder(endpoint);
+        StringBuilder url = new StringBuilder(publicEndpoint.endsWith("/")
+                ? publicEndpoint.substring(0, publicEndpoint.length() - 1) : publicEndpoint);
         url
             .append("/")
             .append(bucketName)

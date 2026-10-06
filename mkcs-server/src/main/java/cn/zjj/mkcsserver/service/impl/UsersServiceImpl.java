@@ -22,6 +22,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.zjj.mkcscommon.Assert;
 import com.zjj.mkcscommon.utils.CommonUtils;
 import com.zjj.mkcscommon.utils.CryptoUtil;
+import com.zjj.mkcscommon.utils.MinIOUtil;
 import com.zjj.mkcscommon.enumeration.ResultCode;
 import com.zjj.mkcscommon.enumeration.VerificationCodeType;
 import com.zjj.mkcscommon.result.Result;
@@ -54,6 +55,7 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
     private final VerificationCodeService verificationCodeService;
     private final RolesMapper rolesMapper;
     private final TokenService tokenService;
+    private final MinIOUtil minIOUtil;
 
     /**
      * 登录方法，支持用户名或邮箱登录，并根据记住我设置不同的超时时间
@@ -415,19 +417,23 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
 
     @Override
     public LoginResponse setUserInfo(Users user) {
-        return UserConverter.toLoginResponse(user,
+        LoginResponse response = UserConverter.toLoginResponse(user,
                 userRolesService.getUserRoleNames(user.getId()),
                 userRolesService.getUserPermissionNames(user.getId()),
                 null);
+        response.setAvatarUrl(minIOUtil.normalizeBucketUrl(response.getAvatarUrl(), "avatar"));
+        return response;
     }
 
     @Override
     public LoginResponse issueLoginResponse(Users user) {
         TokenPair tokenPair = tokenService.issueTokens(user);
-        return UserConverter.toLoginResponse(user,
+        LoginResponse response = UserConverter.toLoginResponse(user,
                 userRolesService.getUserRoleNames(user.getId()),
                 userRolesService.getUserPermissionNames(user.getId()),
                 tokenPair);
+        response.setAvatarUrl(minIOUtil.normalizeBucketUrl(response.getAvatarUrl(), "avatar"));
+        return response;
     }
 }
 

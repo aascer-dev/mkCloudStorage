@@ -23,6 +23,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.io.ByteArrayInputStream;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +36,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -83,6 +85,57 @@ class FilesServiceImplChunkUploadTest {
         lenient().when(redisTemplate.opsForHash()).thenReturn((HashOperations) hashOperations);
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         lenient().when(storageBucketsService.reserveStorage(any(), any(), anyLong())).thenReturn(true);
+    }
+
+    @Test
+    void firstFileUploadCreatesSharedBucketBeforeWritingObject() {
+        when(minIOUtil.createBucket("files")).thenReturn(true);
+        when(fileContentsService.save(any(FileContents.class))).thenAnswer(invocation -> {
+            ((FileContents) invocation.getArgument(0)).setId(8L);
+            return true;
+        });
+        MockMultipartFile file = chunk();
+
+        filesService.uploadFile(10L, file, null, 9L);
+
+        var storageOrder = inOrder(minIOUtil);
+        storageOrder.verify(minIOUtil).bucketExists("files");
+        storageOrder.verify(minIOUtil).createBucket("files");
+        storageOrder.verify(minIOUtil).upload(eq(file), eq("files"), any(String.class));
+    }
+
+    @Test
+    void bucketCreationFailureStopsFileUploadBeforeWritingObjectOrMetadata() {
+        assertThatThrownBy(() -> filesService.uploadFile(10L, chunk(), null, 9L))
+                .hasMessageContaining("文件存储桶不可用: files");
+
+        verify(minIOUtil, never()).upload(any(), any(), any());
+        verify(fileContentsService, never()).save(any(FileContents.class));
+        verifyNoInteractions(filesMapper);
+    }
+
+    @Test
+    void chunkInitializationFailsBeforeSavingTaskWhenStorageIsUnavailable() {
+        assertThatThrownBy(() -> filesService.initChunkUpload(10L, "file.bin", 3L, "hash", 1, null, 9L, null))
+                .hasMessageContaining("文件存储桶不可用: chunks");
+
+        verify(minIOUtil).createBucket("chunks");
+        verifyNoInteractions(redisTemplate);
+    }
+
+    @Test
+    void firstChunkUploadCreatesSharedBucketBeforeWritingChunkAndProgress() {
+        when(hashOperations.entries(UPLOAD_KEY)).thenReturn(uploadTask(10L, 1, new HashSet<>()));
+        when(minIOUtil.createBucket("chunks")).thenReturn(true);
+        MockMultipartFile file = chunk();
+
+        ChunkUploadResponse response = filesService.uploadChunk(10L, "upload-1", 0, file, null, null, null, null);
+
+        assertThat(response.getIsComplete()).isTrue();
+        var storageOrder = inOrder(minIOUtil, hashOperations);
+        storageOrder.verify(minIOUtil).createBucket("chunks");
+        storageOrder.verify(minIOUtil).upload(file, "chunks", "upload-1/0");
+        storageOrder.verify(hashOperations).put(UPLOAD_KEY, "uploadedChunks", Set.of(0));
     }
 
     @Test
