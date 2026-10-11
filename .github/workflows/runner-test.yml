@@ -1,14 +1,18 @@
-name: Runner Dispatch Test
+
+name: Runner Test
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   test:
     runs-on: [self-hosted, "debian13(vmware)"]
     steps:
-      - name: Verify runner
+      - name: Check runner
         run: |
-          echo "Runner received the job"
+          echo "Runner connected successfully"
           hostname
           whoami
