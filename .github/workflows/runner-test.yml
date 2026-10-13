@@ -9,7 +9,7 @@ on:
 
 jobs:
   test:
-    runs-on: [self-hosted, "debian13(vmware)"]
+    runs-on: [self-hosted, mkcs]
     steps:
       - name: Check runner
         run: |
