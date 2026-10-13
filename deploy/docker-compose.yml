@@ -74,6 +74,15 @@ services:
     env_file:
       - .env
     environment:
+      # The JVM reads JAVA_TOOL_OPTIONS before launching the application.
+      # JMX is reachable only inside the mkcs network, including its RMI stub.
+      JAVA_TOOL_OPTIONS: >-
+        -Dcom.sun.management.jmxremote
+        -Dcom.sun.management.jmxremote.port=9010
+        -Dcom.sun.management.jmxremote.rmi.port=9010
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote.ssl=false
+        -Djava.rmi.server.hostname=backend
       SPRING_PROFILES_ACTIVE: prod
       MKCS_DATASOURCE_HOST: mysql
       MKCS_DATASOURCE_PORT: 3306
@@ -88,7 +97,7 @@ services:
       MKCS_RABBITMQ_PORT: 5672
       MKCS_RABBITMQ_USERNAME: ${MKCS_RABBITMQ_USERNAME:-admin}
       MKCS_RABBITMQ_VIRTUAL_HOST: ${MKCS_RABBITMQ_VIRTUAL_HOST:-/}
-    expose: ["8080"]
+    expose: ["8080", "9010"]
     depends_on:
       mysql:
         condition: service_healthy
@@ -98,6 +107,13 @@ services:
         condition: service_healthy
       minio:
         condition: service_started
+    networks: [mkcs]
+
+  zabbix-java-gateway:
+    image: zabbix/zabbix-java-gateway:alpine-7.4-latest
+    restart: unless-stopped
+    ports:
+      - "${MKCS_ZABBIX_GATEWAY_BIND_ADDRESS:-127.0.0.1}:${MKCS_ZABBIX_GATEWAY_HOST_PORT:-10052}:10052"
     networks: [mkcs]
 
   frontend:

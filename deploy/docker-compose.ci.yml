@@ -1,6 +1,11 @@
 name: mkcs-ci
 
 services:
+  zabbix-java-gateway:
+    image: zabbix/zabbix-java-gateway:alpine-7.4-latest
+    ports:
+      - "127.0.0.1:11052:10052"
+
   mysql:
     image: mysql:8.4
     environment:

@@ -14,6 +14,8 @@ on:
       - 'mkcs-server/**'
       - 'deploy/docker-compose.ci.yml'
       - 'deploy/docker-compose.yml'
+      - 'deploy/monitoring/**'
+      - 'deploy/.env.example'
       - 'deploy/nginx/**'
       - '.github/workflows/backend-ci.yml'
       - '.github/workflows/backend-cd.yml'
@@ -30,6 +32,8 @@ on:
       - 'mkcs-server/**'
       - 'deploy/docker-compose.ci.yml'
       - 'deploy/docker-compose.yml'
+      - 'deploy/monitoring/**'
+      - 'deploy/.env.example'
       - 'deploy/nginx/**'
       - '.github/workflows/backend-ci.yml'
       - '.github/workflows/backend-cd.yml'
@@ -71,6 +75,24 @@ jobs:
           set -euo pipefail
           curl --noproxy '*' -fsS http://127.0.0.1:19000/minio/health/ready
           curl --noproxy '*' -i http://127.0.0.1:19000/minio/health/live
+
+      - name: Verify production JMX options through Java Gateway 7.4
+        run: |
+          set -euo pipefail
+          # Resolve production Compose with placeholders, never with production secrets.
+          CHECK_ROOT="$RUNNER_TEMP/mkcs-compose-check"
+          mkdir -p "$CHECK_ROOT"
+          cp deploy/docker-compose.yml "$CHECK_ROOT/docker-compose.yml"
+          cp deploy/.env.example "$CHECK_ROOT/.env"
+          docker compose --env-file "$CHECK_ROOT/.env" -f "$CHECK_ROOT/docker-compose.yml" config --quiet
+          JMX_OPTIONS="$(docker compose --env-file "$CHECK_ROOT/.env" -f "$CHECK_ROOT/docker-compose.yml" config --format json |
+            python3 -c 'import json, sys; print(json.load(sys.stdin)["services"]["backend"]["environment"]["JAVA_TOOL_OPTIONS"])')"
+          docker run -d --name "$COMPOSE_PROJECT_NAME-jmx" \
+            --network "${COMPOSE_PROJECT_NAME}_default" --network-alias backend \
+            -e JAVA_TOOL_OPTIONS="$JMX_OPTIONS" \
+            -v "$PWD/deploy/monitoring/JmxSmoke.java:/tmp/JmxSmoke.java:ro" \
+            eclipse-temurin:21-jdk java /tmp/JmxSmoke.java
+          python3 deploy/monitoring/check-jmx.py --gateway-port 11052
 
       - name: Compile and test
         run: bash ./mvnw -B -ntp verify
@@ -124,7 +146,13 @@ jobs:
 
       - name: Dump dependency logs
         if: failure()
-        run: docker compose -f "$CI_COMPOSE_FILE" logs --no-color minio mysql redis rabbitmq
+        run: |
+          docker compose -f "$CI_COMPOSE_FILE" logs --no-color minio mysql redis rabbitmq zabbix-java-gateway
+          docker logs "$COMPOSE_PROJECT_NAME-jmx" || true
+
+      - name: Stop JMX smoke JVM
+        if: always()
+        run: docker rm -f "$COMPOSE_PROJECT_NAME-jmx" || true
 
       - name: Stop CI dependencies
         if: always()
